@@ -323,6 +323,7 @@ html, body {
 .bd-title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink); }
 .bd-track { width: 64px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.08); overflow: hidden; }
 .bd-fill { display: block; height: 100%; background: linear-gradient(90deg, var(--teal), var(--accent)); transition: width 0.5s; }
+.bd-badge { font-size: 8px; letter-spacing: 1px; text-transform: uppercase; color: var(--ink-dim); border: 1px solid var(--panel-edge); border-radius: 999px; padding: 2px 6px; }
 .bd-empty { color: var(--ink-dim); }
 
 @keyframes pulse {

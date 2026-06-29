@@ -58,7 +58,7 @@ function buildExecutor() {
 
 const { executor, label } = buildExecutor()
 const orchestrator = new Orchestrator({
-  fleet: 18,
+  fleet: Number(process.env.FLEET ?? 5), // small, simple start (override with FLEET=)
   executor: executor ?? undefined,
   maxConcurrent: Number(process.env.MAX_CONCURRENT ?? 6),
 })

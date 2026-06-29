@@ -58,7 +58,7 @@ export class MockGateway extends Emitter {
   constructor(opts = {}) {
     super()
     this.kind = 'simulation'
-    this.total = opts.total ?? 24
+    this.total = opts.total ?? 6
     this.tickMs = opts.tickMs ?? 1100
     this.version = 'v0.1.0 · pre-release · sim'
     this.autoAssign = true
@@ -68,7 +68,7 @@ export class MockGateway extends Emitter {
     this._tasks = []
     this._host = { cpu: 30, mem: 70, disk: 24, net: 12 }
     for (let i = 0; i < this.total; i++) this._agents.push(this._newAgent(i))
-    for (let i = 0; i < 8; i++) this._newTask()
+    for (let i = 0; i < 3; i++) this._newTask()
   }
 
   _newAgent(i, name) {
@@ -268,5 +268,5 @@ export class RemoteGateway extends Emitter {
 export function createGateway() {
   const feed = new URLSearchParams(location.search).get('feed')
   if (feed) return new RemoteGateway(feed)
-  return new MockGateway({ total: 24 })
+  return new MockGateway({ total: 6 })
 }

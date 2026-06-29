@@ -129,14 +129,17 @@ export class Hud {
     this.root.querySelector('#bd-progress').textContent = by.in_progress
     this.root.querySelector('#bd-done').textContent = by.done
 
-    // show the active tasks with progress bars
-    const active = tasks.filter((t) => t.state === 'in_progress').slice(0, 5)
+    // Show the BACKLOG (queued, assignable) first, then in-progress with bars.
+    const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
     const list = this.root.querySelector('#bd-list')
-    list.innerHTML = active.map((t) => `
-      <li>
-        <span class="bd-title">${t.title}</span>
-        <span class="bd-track"><span class="bd-fill" style="width:${Math.round(t.progress * 100)}%"></span></span>
-      </li>`).join('') || '<li class="bd-empty">no active tasks</li>'
+    const rows = []
+    for (const t of tasks.filter((t) => t.state === 'backlog').slice(0, 5)) {
+      rows.push(`<li><span class="bd-title">${esc(t.title)}</span><span class="bd-badge">queued</span></li>`)
+    }
+    for (const t of tasks.filter((t) => t.state === 'in_progress').slice(0, 4)) {
+      rows.push(`<li><span class="bd-title">${esc(t.title)}</span><span class="bd-track"><span class="bd-fill" style="width:${Math.round(t.progress * 100)}%"></span></span></li>`)
+    }
+    list.innerHTML = rows.join('') || '<li class="bd-empty">board empty</li>'
   }
 
   _setMeter(id, pct) {

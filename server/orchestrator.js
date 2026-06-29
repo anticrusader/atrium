@@ -65,12 +65,12 @@ export class Orchestrator {
     this.version = 'v0.1.0 · pre-release'
     this._feed = []         // recent activity lines
 
-    // Seed an initial fleet so the office isn't empty on first connect.
-    const n = opts.fleet ?? 18
+    // Seed a small fleet so the office isn't empty on first connect.
+    const n = opts.fleet ?? 5
     for (let i = 0; i < n; i++) this.spawn(1, { silent: true })
-    // Seed a backlog — a mix of simulated work and a few REAL tasks.
-    for (let i = 0; i < 6; i++) this.createTask({}, { silent: true })
-    for (let i = 0; i < 2; i++) this.createTask({ kind: 'research' }, { silent: true })
+    // Seed a small backlog — a couple simulated + one of each real kind.
+    for (let i = 0; i < 2; i++) this.createTask({}, { silent: true })
+    this.createTask({ kind: 'research' }, { silent: true })
     this.createTask({ kind: 'factcheck' }, { silent: true })
   }
 

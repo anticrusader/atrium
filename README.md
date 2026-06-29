@@ -74,7 +74,11 @@ falls back to the in-browser simulation.
 - **Agent directory** (left): a scrollable list of every agent (name + live
   status). Click a row — or click the agent in the 3D office — to select it
   (the two stay in sync) and expand its details + actions: **pause / resume**,
-  **✎ rename**, **assign** the next task, **send to** any zone, **✕ remove**.
+  **✎ rename**, **✕ remove**, **assign a task…** (pick a *specific* backlog task
+  from the dropdown), and **send to zone…**.
+- **Task board** (top-right) lists the **backlog** (queued, assignable tasks)
+  plus in-progress tasks with progress bars. Turn `auto: off` to hand-assign
+  everything yourself.
 - Or from the browser console: `__agora.gateway.send('spawn', { count: 5 })`.
 
 ---
@@ -197,7 +201,7 @@ the deterministic handoff in [`server/orchestrator.js`](server/orchestrator.js).
 | What | Where |
 |---|---|
 | Orchestrator port / tick rate | env: `PORT`, `HOST`, `TICK_MS` for `npm run server` |
-| Initial fleet size | `new Orchestrator({ fleet })` in `server/index.js` |
+| Initial fleet size | env `FLEET` (default 5), e.g. `FLEET=12 npm run dev:all` |
 | Scheduler policy | `_dispatch()` in `server/orchestrator.js` |
 | Zones / furniture | `ZONE_LAYOUT` + `decorateZone()` in `src/scene/office.js` |
 | Camera / lighting | `src/scene/world.js` |

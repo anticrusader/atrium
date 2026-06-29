@@ -23,6 +23,8 @@ function el(tag, cls, html) {
   return n
 }
 
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+
 function fmtUptime(sec = 0) {
   const d = Math.floor(sec / 86400), h = Math.floor((sec % 86400) / 3600), m = Math.floor((sec % 3600) / 60)
   if (d) return `${d}d ${h}h`
@@ -93,10 +95,14 @@ export class Controls {
       const head = e.target.closest('.dir__row')
       if (head) this._select(head.closest('[data-id]').dataset.id)
     })
-    // Send-to-zone dropdown.
+    // Dropdowns: assign a specific backlog task, or send the agent to a zone.
     this.list.addEventListener('change', (e) => {
-      const sel = e.target.closest('select[data-act="move"]')
-      if (sel && sel.value) { this.send(COMMAND.MOVE, { agentId: sel.closest('[data-id]').dataset.id, zone: sel.value }); sel.value = '' }
+      const sel = e.target.closest('select[data-act]')
+      if (!sel || !sel.value) return
+      const id = sel.closest('[data-id]').dataset.id
+      if (sel.dataset.act === 'move') this.send(COMMAND.MOVE, { agentId: id, zone: sel.value })
+      else if (sel.dataset.act === 'assign') this.send(COMMAND.ASSIGN, { agentId: id, taskId: sel.value })
+      sel.value = ''
     })
 
     this.root.append(this.toolbar, this.dir)
@@ -192,19 +198,26 @@ export class Controls {
     else if (sel && det) this._updateDetail(det, a) // update text, leave controls intact
   }
 
+  // Options for the "assign a task…" dropdown: the current backlog.
+  _backlogOptions() {
+    const backlog = this._tasks.filter((t) => t.state === 'backlog')
+    if (!backlog.length) return '<option value="" disabled>backlog empty</option>'
+    return backlog.map((t) => `<option value="${t.id}">${esc(t.title)}</option>`).join('')
+  }
+
   _detailHtml(a) {
     const paused = a.status === 'paused'
     const zones = ZONES.map((z) => `<option value="${z.key}">${z.label}</option>`).join('')
     return `<div class="dir__detail">
-        <div class="dir__meta">${a.model} · ${a.platform}</div>
-        <div class="dir__meta">${a.status} — ${a.task || 'idle'}</div>
+        <div class="dir__meta">${esc(a.model)} · ${esc(a.platform)}</div>
+        <div class="dir__meta">${a.status} — ${esc(a.task || 'idle')}</div>
         <div class="dir__meta">uptime ${fmtUptime(a.uptime)}</div>
         <div class="dir__acts">
           <button data-act="${paused ? 'resume' : 'pause'}">${paused ? '▶ resume' : '⏸ pause'}</button>
           <button data-act="rename">✎ rename</button>
-          <button data-act="assign">assign</button>
           <button data-act="kill" class="danger">✕ remove</button>
         </div>
+        <select data-act="assign" class="dir__move"><option value="">assign a task…</option>${this._backlogOptions()}</select>
         <select data-act="move" class="dir__move"><option value="">send to zone…</option>${zones}</select>
       </div>`
   }
@@ -219,6 +232,11 @@ export class Controls {
       const paused = a.status === 'paused'
       pr.dataset.act = paused ? 'resume' : 'pause'
       pr.textContent = paused ? '▶ resume' : '⏸ pause'
+    }
+    // Keep the backlog options fresh — but not while the user has it open.
+    const asel = det.querySelector('select[data-act="assign"]')
+    if (asel && document.activeElement !== asel) {
+      asel.innerHTML = `<option value="">assign a task…</option>` + this._backlogOptions()
     }
   }
 }
