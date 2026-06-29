@@ -47,6 +47,14 @@ browser ◀─ EVENTS   (snapshot, tick: agents+tasks+host) ── orchestrator
 Verified working: production build (13 modules), and a WS smoke test confirming
 snapshot + commands (spawn/create_task acked) + tick reconciliation.
 
+## Persistence (state survives restarts)
+
+The orchestrator world — fleet, task board, cumulative completed count, auto flag
+— is saved to `server/state.json` (gitignored) every 5s and on SIGINT/SIGTERM,
+and restored on boot. See `server/store.js` and `Orchestrator.seed()/toState()/
+hydrate()`; `server/index.js` restores if a saved world exists, else seeds.
+Restarts no longer wipe custom/named agents. (Hard kills lose at most ~5s.)
+
 ## Conventions
 
 - Plain ESM JavaScript (no TypeScript). Vanilla Three.js + DOM (no React).
