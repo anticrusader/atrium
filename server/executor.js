@@ -12,6 +12,11 @@
 // free-tier limits. Agents that can't get a token this tick simply make no
 // progress and try again — you can watch the fleet bottleneck on the limit,
 // which is exactly how real orchestration behaves under a constrained resource.
+//
+// Task kinds: a normal task is "narrated" by the model (simulated work); a
+// `research` task does GENUINELY REAL work via researchStep (Wikipedia + model).
+
+import { researchStep } from './research.js'
 
 const now = () => Date.now()
 
@@ -62,20 +67,9 @@ export function makeLLMExecutor(cfg) {
   let inFlight = 0
   const stats = { calls: 0, errors: 0, rateLimited: 0 }
 
-  async function step(agent, task) {
-    task.scratch ??= []
-
-    // Force a clean finish after enough real steps so tasks don't run forever.
-    if (task.scratch.length >= maxSteps) {
-      return { delta: 1, note: `wrapped up: ${task.title}` }
-    }
-
-    // Gate on the shared budget. No token → no progress this tick (try again).
-    if (inFlight >= maxInFlight || !limiter.take()) {
-      stats.rateLimited++
-      return { delta: 0, note: '⏳ waiting for model slot' }
-    }
-
+  // One raw model call. Shared by the narration step AND the research step.
+  // Handles model rotation on 429/5xx. Returns { ok, text, status }.
+  async function chat(messages, maxTokens = 80) {
     inFlight++
     try {
       const res = await fetch(`${baseURL}/chat/completions`, {
@@ -83,67 +77,67 @@ export function makeLLMExecutor(cfg) {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
-          // OpenRouter likes these; harmless elsewhere.
-          'HTTP-Referer': 'http://localhost',
+          'HTTP-Referer': 'http://localhost', // OpenRouter likes these; harmless elsewhere
           'X-Title': 'Hermes Agora',
         },
-        body: JSON.stringify({
-          model: activeModel(),
-          max_tokens: 80,
-          temperature: 0.7,
-          messages: [
-            {
-              role: 'system',
-              content:
-                `You are ${agent.name}, an AI agent working in a virtual office. ` +
-                `Do ONE small next step on your task. Reply with a single short ` +
-                `sentence (max 15 words) describing what you just did. If the task ` +
-                `is now fully complete, end your reply with the token DONE.`,
-            },
-            {
-              role: 'user',
-              content:
-                `Task: "${task.title}".\nSteps so far:\n` +
-                (task.scratch.length
-                  ? task.scratch.map((s, i) => `${i + 1}. ${s}`).join('\n')
-                  : '(none yet)') +
-                `\nYour next step:`,
-            },
-          ],
-        }),
+        body: JSON.stringify({ model: activeModel(), max_tokens: maxTokens, temperature: 0.7, messages }),
       })
-
-      if (res.status === 429) {
-        // This model is upstream-limited — rotate to the next fallback model
-        // and apply a short global cooldown so we don't spin.
-        const was = activeModel()
-        rotate()
-        limiter.backoff(3000)
-        stats.rateLimited++
-        return { delta: 0, note: `⏳ ${was.split('/').pop()} busy → trying ${activeModel().split('/').pop()}` }
-      }
+      if (res.status === 429) { rotate(); limiter.backoff(3000); stats.rateLimited++; return { ok: false, status: 429 } }
       if (!res.ok) {
         stats.errors++
         const body = await res.text().catch(() => '')
         console.warn(`[executor] ${res.status} on ${activeModel()}: ${body.slice(0, 140)}`)
-        rotate() // 404/5xx → try a different model next time too
-        return { delta: 0.34, note: `model error ${res.status}` }
+        rotate()
+        return { ok: false, status: res.status }
       }
-
       stats.calls++
       const data = await res.json()
-      let text = data?.choices?.[0]?.message?.content?.trim() || '(no output)'
-      const done = /\bDONE\b/.test(text)
-      text = text.replace(/\bDONE\b/gi, '').replace(/\s+/g, ' ').trim()
-      if (text) task.scratch.push(text)
-      return { delta: done ? 1 : 0.26, note: text || 'thinking…' }
+      return { ok: true, text: (data?.choices?.[0]?.message?.content || '').trim() }
     } catch (err) {
       stats.errors++
-      return { delta: 0.34, note: `model unreachable: ${err.message || 'error'}` }
+      return { ok: false, status: 0, error: err.message }
     } finally {
       inFlight--
     }
   }
 
-  return { step, info: { models, baseURL, rpm }, current: activeModel, stats }
+  // Simulated-but-model-narrated step (the default task kind).
+  async function narrationStep(agent, task) {
+    task.scratch ??= []
+    if (task.scratch.length >= maxSteps) return { delta: 1, note: `wrapped up: ${task.title}` }
+    if (inFlight >= maxInFlight || !limiter.take()) { stats.rateLimited++; return { delta: 0, note: '⏳ waiting for model slot' } }
+    const r = await chat([
+      {
+        role: 'system',
+        content:
+          `You are ${agent.name}, an AI agent working in a virtual office. Do ONE small next ` +
+          `step on your task. Reply with a single short sentence (max 15 words) describing ` +
+          `what you just did. If the task is now fully complete, end with the token DONE.`,
+      },
+      {
+        role: 'user',
+        content:
+          `Task: "${task.title}".\nSteps so far:\n` +
+          (task.scratch.length ? task.scratch.map((s, i) => `${i + 1}. ${s}`).join('\n') : '(none yet)') +
+          `\nYour next step:`,
+      },
+    ], 80)
+    if (!r.ok) {
+      if (r.status === 429) return { delta: 0, note: `⏳ busy → trying ${activeModel().split('/').pop()}` }
+      return { delta: 0.34, note: `model error ${r.status || 'unreachable'}` }
+    }
+    let text = r.text || '(no output)'
+    const done = /\bDONE\b/.test(text)
+    text = text.replace(/\bDONE\b/gi, '').replace(/\s+/g, ' ').trim()
+    if (text) task.scratch.push(text)
+    return { delta: done ? 1 : 0.26, note: text || 'thinking…' }
+  }
+
+  // Dispatch by task kind: research tasks do REAL tool work; others narrate.
+  async function step(agent, task) {
+    if (task.kind === 'research') return researchStep({ task, chat, limiter })
+    return narrationStep(agent, task)
+  }
+
+  return { step, chat, info: { models, baseURL, rpm }, current: activeModel, stats }
 }

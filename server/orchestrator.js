@@ -23,6 +23,14 @@ const TASK_TITLES = [
 // Which zone a task naturally happens in (so agents walk somewhere sensible).
 const TASK_ZONE = ['designers', 'jira', 'office', 'conference', 'library']
 
+// Real research topics — these get genuinely looked up on Wikipedia.
+const RESEARCH_TOPICS = [
+  'the Antikythera mechanism', 'tardigrades', 'the Voyager program', 'black holes',
+  'the printing press', 'CRISPR gene editing', 'the Silk Road', 'quantum entanglement',
+  'photosynthesis', 'the Apollo program', 'octopus intelligence', 'Roman aqueducts',
+  'general relativity', 'the history of coffee', 'mycorrhizal networks', 'the transistor',
+]
+
 const r = (n) => Math.floor(Math.random() * n)
 const pick = (a) => a[r(a.length)]
 
@@ -45,8 +53,9 @@ export class Orchestrator {
     // Seed an initial fleet so the office isn't empty on first connect.
     const n = opts.fleet ?? 18
     for (let i = 0; i < n; i++) this.spawn(1, { silent: true })
-    // Seed a backlog.
-    for (let i = 0; i < 8; i++) this.createTask({}, { silent: true })
+    // Seed a backlog — a mix of simulated work and a couple of REAL research tasks.
+    for (let i = 0; i < 7; i++) this.createTask({}, { silent: true })
+    for (let i = 0; i < 2; i++) this.createTask({ kind: 'research' }, { silent: true })
   }
 
   // ── Command handlers (the control plane) ─────────────────────────────────
@@ -74,17 +83,24 @@ export class Orchestrator {
     return true
   }
 
-  createTask({ title, zone, stage, parent } = {}, opts = {}) {
+  createTask({ title, zone, stage, parent, kind, topic } = {}, opts = {}) {
     _taskSeq += 1
+    // A `research` task is REAL work: it looks up a topic on Wikipedia and the
+    // model summarizes the fetched content (see server/research.js). It happens
+    // in the library.
+    const isResearch = kind === 'research'
+    const tp = topic || (isResearch ? pick(RESEARCH_TOPICS) : null)
     const task = {
       id: `t${_taskSeq.toString().padStart(3, '0')}`,
-      title: title || pick(TASK_TITLES),
-      zone: (zone && ZONE_KEYS.includes(zone)) ? zone : pick(TASK_ZONE),
+      title: title || (isResearch ? `research: ${tp}` : pick(TASK_TITLES)),
+      zone: isResearch ? 'library' : (zone && ZONE_KEYS.includes(zone)) ? zone : pick(TASK_ZONE),
       state: TASK_STATE.BACKLOG,
       agentId: null,
       progress: 0,
       stage: stage ?? 1,      // 1 = original work, 2 = a follow-up from a handoff
       parent: parent ?? null, // the task this one was handed off from
+      kind: isResearch ? 'research' : 'sim',
+      topic: tp,              // the real subject for a research task
     }
     this.tasks.set(task.id, task)
     if (!opts.silent) this._log({ who: 'board', verb: 'new task', what: task.title })
@@ -205,7 +221,10 @@ export class Orchestrator {
 
     // keep a steady trickle of new work so the demo never stalls
     const backlogCount = [...this.tasks.values()].filter((t) => t.state === TASK_STATE.BACKLOG).length
-    if (backlogCount < 3 && Math.random() < 0.5) this.createTask({}, { silent: true })
+    if (backlogCount < 3 && Math.random() < 0.5) {
+      // ~30% of fresh work is a real research task.
+      this.createTask(Math.random() < 0.3 ? { kind: 'research' } : {}, { silent: true })
+    }
 
     // 4. PUBLISH payload
     const agents = [...this.agents.values()].map((a) => a.toRecord())
@@ -213,11 +232,21 @@ export class Orchestrator {
     const host = this._host(metricsSample, active)
     return {
       agents,
-      tasks: [...this.tasks.values()],
+      tasks: this._wireTasks(),
       host,
       active,
       events: events.slice(-6),
     }
+  }
+
+  // Serialize tasks for the wire, dropping bulky internal fields (e.g. the
+  // fetched Wikipedia extract stored on research tasks as `_extract`).
+  _wireTasks() {
+    return [...this.tasks.values()].map((t) => {
+      const o = {}
+      for (const k in t) if (!k.startsWith('_')) o[k] = t[k]
+      return o
+    })
   }
 
   snapshot(metricsSample) {
@@ -225,7 +254,7 @@ export class Orchestrator {
     const active = agents.filter((a) => a.status !== STATUS.IDLE && a.status !== STATUS.PAUSED).length
     return {
       agents,
-      tasks: [...this.tasks.values()],
+      tasks: this._wireTasks(),
       host: this._host(metricsSample, active),
       version: this.version,
     }

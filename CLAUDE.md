@@ -126,7 +126,31 @@ LOCAL model (see RTX 3090 note above) which has no limits. DeepSeek V4 exists bu
 `deepseek-v4-flash` is currently *paid-but-cheap* (~$0.09/M), not in the free
 catalog.
 
+## Real research task — DONE (genuinely real work, not simulated)
+
+Most tasks are simulated narration. A task with `kind:'research'` does REAL work
+(`server/research.js`, routed from `executor.js`): (1) SEARCH the live Wikipedia
+API for `task.topic`, (2) READ the real article extract, (3) SUMMARIZE that real
+content with the model. "Done" = a grounded summary was actually produced
+(stored on `task.result`); the 📚 summary appears in the activity feed. Phases
+advance one per tick via the same async WORKING loop. Only the summarize phase
+spends a rate-limiter token (search/read are free Wikipedia calls).
+
+- Created via: the **`+ research`** toolbar button (sends `create_task {kind:'research'}`),
+  the seed (2 at boot), and the trickle (~30%). Research happens in the library.
+- `Orchestrator._wireTasks()` strips `_`-prefixed fields (e.g. `_extract`) from
+  the wire payload.
+- Verified live: e.g. "searched Wikipedia for 'black holes' → found 'Black hole'"
+  → "read … 608 chars of real content" → "📚 A black hole is an extremely compact
+  astronomical body whose gravity is so strong that nothing, including light, can
+  escape from it."
+- NOTE: offline `MockGateway` can't fetch, so it only *labels* research tasks and
+  narrates them — real research needs the backend (`?feed=ws://…`).
+- This is the template for ALL real work: swap Wikipedia for any tool (web
+  search, file read, API, test runner) and decide completion from real results.
+
 ## Possible NEXT STEPS (not done)
+- More real task kinds (web search via Tavily/Brave, run a shell command, etc.).
 - Priority / skill-based scheduling in `Orchestrator._dispatch()`.
 - Surface the *currently active* model (post-rotation) in the HUD; executor
   exposes `current()`.

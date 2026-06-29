@@ -139,7 +139,9 @@ export class Agent {
           if (task.progress >= 1) {
             this.status = STATUS.MESSAGING
             this._beat = 1
-            return { who: this.name, verb: 'finishing', what: task.title }
+            // Surface the final note (e.g. a research task's 📚 grounded summary)
+            // instead of discarding it behind a generic label.
+            return { who: this.name, verb: 'finishing', what: note || task.title }
           }
           // suppress the feed line when nothing happened (e.g. rate-limited)
           return delta > 0 ? { who: this.name, verb: 'working', what: note } : null

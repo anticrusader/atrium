@@ -38,7 +38,8 @@ export class Controls {
     this.toolbar = el('div', 'hud__panel toolbar')
     this.toolbar.innerHTML = `
       <button data-act="spawn" title="Create a new agent">+ agent</button>
-      <button data-act="task" title="Add a task to the backlog">+ task</button>
+      <button data-act="task" title="Add a simulated task to the backlog">+ task</button>
+      <button data-act="research" title="Add a REAL research task (live Wikipedia lookup + summary)">+ research</button>
       <button data-act="auto" title="Toggle the auto-dispatcher">auto: <b>on</b></button>
       <button data-act="reset" class="ghost" title="Clear the board">reset</button>
     `
@@ -47,6 +48,7 @@ export class Controls {
       const act = b.dataset.act
       if (act === 'spawn') this.send(COMMAND.SPAWN, { count: 1 })
       else if (act === 'task') this.send(COMMAND.CREATE_TASK, {})
+      else if (act === 'research') this.send(COMMAND.CREATE_TASK, { kind: 'research' })
       else if (act === 'reset') this.send(COMMAND.RESET, {})
       else if (act === 'auto') {
         this._auto = !this._auto

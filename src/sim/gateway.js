@@ -83,10 +83,15 @@ export class MockGateway extends Emitter {
 
   _newTask(opts = {}) {
     this._taskSeq += 1
+    // Note: the offline sim can't make real network calls, so a 'research' task
+    // here is just labeled like one and narrated. Real research needs the
+    // orchestrator backend (?feed=ws://...).
+    const isResearch = opts.kind === 'research'
+    const topic = isResearch ? pick(['tardigrades', 'black holes', 'the Silk Road', 'CRISPR', 'photosynthesis']) : null
     const t = {
       id: `t${this._taskSeq.toString().padStart(3, '0')}`,
-      title: opts.title || pick(TASK_TITLES),
-      zone: ZONES.find((z) => z.key === opts.zone) ? opts.zone : pick(TASK_ZONE),
+      title: opts.title || (isResearch ? `research: ${topic}` : pick(TASK_TITLES)),
+      zone: isResearch ? 'library' : (ZONES.find((z) => z.key === opts.zone) ? opts.zone : pick(TASK_ZONE)),
       state: 'backlog', agentId: null, progress: 0,
     }
     this._tasks.push(t)

@@ -149,6 +149,25 @@ To customize *what the agent does* each step (tools, different prompt, real
 APIs), edit `step()` in [`server/executor.js`](server/executor.js). Concepts and
 patterns: [docs/ORCHESTRATION.md §7](docs/ORCHESTRATION.md#7-making-the-agents-real).
 
+### Real research tasks (genuine tool use)
+
+Most tasks are *simulated* (the model narrates plausible steps). A **research
+task** is genuinely real: click **`+ research`** in the toolbar (or it appears
+automatically) and the assigned agent will, live:
+
+1. **search** the real Wikipedia API for a topic,
+2. **read** the real article extract, then
+3. **summarize** that real content with the model.
+
+You'll see it in the activity feed — *searched Wikipedia for "black holes" →
+found "Black hole"* → *read … 608 chars of real content* → *📚 A black hole is an
+extremely compact astronomical body whose gravity is so strong that nothing,
+including light, can escape it.* "Done" means a grounded summary was actually
+produced, not a counter. Code: [`server/research.js`](server/research.js). This
+is the template for any real tool: swap Wikipedia for web search, a file read, an
+API call, or a test runner. (Needs the backend — `?feed=ws://…`; the offline sim
+can't make network calls.)
+
 ## Configuration
 
 | What | Where |
