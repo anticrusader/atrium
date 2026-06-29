@@ -116,13 +116,38 @@ docs/
   PROTOCOL.md           # wire-format reference
 ```
 
-## Make the agents real
+## Real model executor (the whole fleet on a live LLM)
 
-The agents currently *simulate* work. To have them actually do something, you
-replace **one function** — the executor's `step()` in
-[`server/agent-runtime.js`](server/agent-runtime.js) — e.g. with a model call.
-Nothing else changes. Worked example (including an LLM executor) in
-[docs/ORCHESTRATION.md §7](docs/ORCHESTRATION.md#7-making-the-agents-real).
+The agents can run on a **real model** instead of simulated work. This is wired
+in [`server/executor.js`](server/executor.js) and enabled automatically when a
+key is present.
+
+1. `cp .env.example .env` and put your OpenRouter key in `OPENROUTER_API_KEY`
+   (free key: <https://openrouter.ai/keys>). `.env` is gitignored.
+2. `npm run dev:all`, then open `http://127.0.0.1:5173/?feed=ws://127.0.0.1:8787`.
+3. The HUD shows the model name + `(live)`, and the activity feed fills with the
+   model's actual step-by-step reasoning.
+
+How it stays within free limits:
+
+- **Shared rate limiter** across the whole fleet (`LLM_RPM`, default 15/min —
+  free tier is ~20 RPM / ~200 RPD). Agents that can't get a slot wait and retry,
+  so you can literally watch the fleet bottleneck on the budget.
+- **Model fallback list** — `LLM_MODEL` is comma-separated; on a `429` the
+  executor rotates to the next model. The default tries on-theme
+  `nousresearch/hermes-3-llama-3.1-405b:free` first, then working free models.
+- Non-blocking: a slow model call never stalls the tick loop (the agent runtime
+  is async-aware).
+
+> Free `:free` models share global capacity and are often `429` / rotate their
+> ids. If you hit constant throttling, switch to a **local** model on a GPU box:
+> set `LLM_BASE_URL=http://localhost:11434/v1`, `LLM_MODEL=hermes3:8b`,
+> `OPENROUTER_API_KEY=ollama` (Ollama; any non-empty key). An RTX 3090 (24GB)
+> runs `hermes3:8b` comfortably.
+
+To customize *what the agent does* each step (tools, different prompt, real
+APIs), edit `step()` in [`server/executor.js`](server/executor.js). Concepts and
+patterns: [docs/ORCHESTRATION.md §7](docs/ORCHESTRATION.md#7-making-the-agents-real).
 
 ## Configuration
 

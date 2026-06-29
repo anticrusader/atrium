@@ -57,6 +57,8 @@ export class Agent {
     // internal timers
     this._walk = 0              // ticks left before "arriving"
     this._beat = 0             // ticks until next think/work flip
+    this._pending = false       // an async executor call is in flight
+    this._result = null         // a resolved executor result awaiting apply
   }
 
   get busy() {
@@ -87,6 +89,8 @@ export class Agent {
     this.zone = task.zone
     this.status = STATUS.WALKING
     this._walk = 2 + r(2)
+    this._pending = false
+    this._result = null
     task.state = TASK_STATE.ASSIGNED
     task.agentId = this.id
   }
@@ -124,19 +128,32 @@ export class Agent {
       }
 
       case STATUS.WORKING: {
-        // Do one unit of work via the (pluggable) executor.
-        const { delta, note } = this.executor.step(this, task)
-        task.progress = Math.min(1, task.progress + delta)
-        if (task.progress >= 1) {
-          this.status = STATUS.MESSAGING
-          this._beat = 1
-          return { who: this.name, verb: 'finishing', what: task.title }
+        // The executor may be ASYNC (a real model call takes seconds). We must
+        // not block the tick loop, so we fire the call once and let it resolve
+        // over future ticks: while a call is in flight the agent simply stays
+        // in WORKING. When the result lands we apply it on the next tick.
+        if (this._result) {
+          const { delta, note } = this._result
+          this._result = null
+          if (delta > 0) task.progress = Math.min(1, task.progress + delta)
+          if (task.progress >= 1) {
+            this.status = STATUS.MESSAGING
+            this._beat = 1
+            return { who: this.name, verb: 'finishing', what: task.title }
+          }
+          // suppress the feed line when nothing happened (e.g. rate-limited)
+          return delta > 0 ? { who: this.name, verb: 'working', what: note } : null
         }
-        if (--this._beat <= 0) {
-          this.status = STATUS.THINKING
-          this._beat = 1
+
+        if (!this._pending) {
+          this._pending = true
+          // Promise.resolve(...) handles both sync and async executors uniformly.
+          Promise.resolve()
+            .then(() => this.executor.step(this, task))
+            .then((res) => { this._result = res; this._pending = false })
+            .catch((err) => { this._result = { delta: 0.34, note: `error: ${err.message}` }; this._pending = false })
         }
-        return { who: this.name, verb: 'working', what: note }
+        return null
       }
 
       case STATUS.MESSAGING: {
@@ -148,6 +165,8 @@ export class Agent {
         this.taskId = null
         this.task = 'idle'
         this.status = STATUS.IDLE
+        this._pending = false
+        this._result = null
         // idle agents drift to a social zone
         this.zone = pick(['lounge', 'cafe', 'playroom', 'courtyard'])
         return { who: this.name, verb: 'completed', what: title }

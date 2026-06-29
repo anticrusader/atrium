@@ -56,29 +56,50 @@ snapshot + commands (spawn/create_task acked) + tick reconciliation.
 - Zone keys: reception, lounge, designers, library, cafe, playroom, jira,
   conference, office, courtyard.
 
-## NEXT STEP (agreed, not yet done)
+## Real model executor — DONE (the WHOLE fleet runs on a live model)
 
-Make **one** agent call a **real model** so the owner can watch a genuine
-plan→act→observe loop in the 3D view. Replace `simulatedExecutor.step()` in
-`server/agent-runtime.js` (worked `llmExecutor` example in
-[docs/ORCHESTRATION.md §7](docs/ORCHESTRATION.md)). Nothing else changes.
+Implemented in **`server/executor.js`** (`makeLLMExecutor`). `server/index.js`
+loads `.env` (`process.loadEnvFile()`), and if `OPENROUTER_API_KEY` is set it
+builds the LLM executor and hands it to the orchestrator; otherwise it falls
+back to simulated work. The agent runtime (`server/agent-runtime.js`) was made
+**async-aware**: an agent fires one model call in `WORKING`, stays put while it's
+in flight, and applies the result on a later tick (never blocks the loop). Each
+agent keeps working memory in `task.scratch`.
 
-**Model priority:**
-1. **Free hosted model first** (OpenAI-compatible, so the executor is the same
-   code with a different base URL + model id):
-   - OpenRouter `nousresearch/hermes-3-llama-3.1-405b:free` — a real free Hermes
-     model, on-theme (`https://openrouter.ai/api/v1`, ~20 RPM / ~200 RPD).
-   - or Groq `llama-3.1-8b-instant` — fast, ~14,400 req/day
-     (`https://api.groq.com/openai/v1`).
-2. **If no suitable free model is available, fall back to LOCAL models** on the
-   owner's other machine (**RTX 3090, 24GB**): Ollama, OpenAI-compatible at
-   `http://localhost:11434/v1`, model `hermes3:8b` (fits 24GB; 70B does not at a
-   good quant).
+Key design points (all in `server/executor.js`):
+- **Shared rate limiter** (token bucket, `LLM_RPM`, default 15/min) across the
+  whole fleet — the free tier is ~20 RPM / ~200 RPD. You can watch the fleet
+  bottleneck on it.
+- **Model fallback list**: `LLM_MODEL` is comma-separated. On a 429/5xx it
+  **rotates to the next model**. Default list starts with on-theme Hermes, then
+  working free models.
+- Concurrency cap (`maxInFlight`), 429 cooldown, and forced task completion
+  after `maxSteps` real steps.
 
-When wiring it: keep `step()` to one small unit per call, add a concurrency cap
-in `_dispatch()` so it doesn't fire many parallel rate-limited calls, and start
-with a single agent so every step is readable. Never commit API keys — read from
-`process.env`.
+**Reality check (verified):** the on-theme `nousresearch/hermes-3-llama-3.1-405b:free`
+is frequently **429 upstream** (shared free capacity), so the executor rotates to
+`google/gemma-4-26b-a4b-it:free` (responds in ~3.5s) or
+`meta-llama/llama-3.3-70b-instruct:free`. The `:free` slugs rotate over time —
+re-probe `GET {baseURL}/models` (filter pricing 0) if they 404.
+
+Config lives in `.env` (gitignored; template in `.env.example`). Never commit
+keys. To run live: ensure `.env` has the key, then `npm run dev:all` and open
+`?feed=ws://127.0.0.1:8787`. The HUD shows the model name + `(live)`.
+
+### Local fallback (owner's other machine, RTX 3090 24GB)
+If hosted free models are too throttled, run locally with Ollama
+(OpenAI-compatible at `http://localhost:11434/v1`, model `hermes3:8b` — fits
+24GB; 70B does not at a good quant). Just point `.env` at it:
+`LLM_BASE_URL=http://localhost:11434/v1`, `LLM_MODEL=hermes3:8b`,
+`OPENROUTER_API_KEY=ollama` (any non-empty string).
+
+## Possible NEXT STEPS (not done)
+
+- Agent-to-agent handoff: on completion, an agent creates a follow-up task for a
+  teammate (a 2-stage pipeline). The `MESSAGING` state is the natural hook.
+- Priority / skill-based scheduling in `Orchestrator._dispatch()`.
+- Surface the *currently active* model (post-rotation) in the HUD, not just the
+  primary; executor already exposes `current()`.
 
 ## Memory portability
 

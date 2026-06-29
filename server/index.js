@@ -14,13 +14,37 @@
 import { WebSocketServer } from 'ws'
 import { Orchestrator } from './orchestrator.js'
 import { Metrics } from './metrics.js'
+import { makeLLMExecutor } from './executor.js'
 import { EVENT, event, isCommand } from './protocol.js'
+
+// Load .env (Node 20.6+: no dependency needed). Safe if the file is absent.
+try { process.loadEnvFile() } catch { /* no .env — that's fine */ }
 
 const PORT = Number(process.env.PORT ?? 8787)
 const HOST = process.env.HOST ?? '127.0.0.1'
 const TICK_MS = Number(process.env.TICK_MS ?? 1100)
 
-const orchestrator = new Orchestrator({ fleet: 18 })
+// Choose the executor: a real LLM if a key is configured, else the simulation.
+// The WHOLE fleet shares this one executor (and its rate limiter).
+function buildExecutor() {
+  const key = process.env.OPENROUTER_API_KEY || process.env.LLM_API_KEY || process.env.GROQ_API_KEY
+  const baseURL = process.env.LLM_BASE_URL || 'https://openrouter.ai/api/v1'
+  const model = process.env.LLM_MODEL || 'nousresearch/hermes-3-llama-3.1-405b:free'
+  const rpm = Number(process.env.LLM_RPM ?? 15)
+  if (!key) {
+    console.log('  [executor] no API key found → simulated work (set OPENROUTER_API_KEY in .env)')
+    return { executor: null, label: 'simulation' }
+  }
+  const ex = makeLLMExecutor({ apiKey: key, baseURL, model, rpm })
+  console.log(`  [executor] LIVE — ${ex.info.models.length} model(s), ${rpm} req/min shared across the fleet`)
+  ex.info.models.forEach((m, i) => console.log(`     ${i === 0 ? '▶' : ' '} ${m}`))
+  // Label shows the primary (on-theme) model; the executor rotates on 429.
+  return { executor: ex, label: ex.info.models[0].split('/').pop() }
+}
+
+const { executor, label } = buildExecutor()
+const orchestrator = new Orchestrator({ fleet: 18, executor: executor ?? undefined })
+if (executor) orchestrator.version = `v0.1.0 · ${label} (live)`
 const metrics = new Metrics()
 
 const wss = new WebSocketServer({ host: HOST, port: PORT })
