@@ -82,9 +82,20 @@ is frequently **429 upstream** (shared free capacity), so the executor rotates t
 `meta-llama/llama-3.3-70b-instruct:free`. The `:free` slugs rotate over time —
 re-probe `GET {baseURL}/models` (filter pricing 0) if they 404.
 
+**Providers (provider-aware `buildExecutor` in `server/index.js`):** `LLM_PROVIDER`
+selects the key + default base URL — `nvidia` (NVIDIA_API_KEY,
+`integrate.api.nvidia.com/v1`), `openrouter` (OPENROUTER_API_KEY), `groq`, or
+`ollama` (local). All OpenAI-compatible. **Current active = NVIDIA build** (much
+more generous free tier than OpenRouter): primary model
+`meta/llama-3.3-70b-instruct` (fast ~1.3s, clean instruct output), fallbacks
+`nvidia/llama-3.3-nemotron-super-49b-v1` + `meta/llama-3.1-8b-instruct`,
+`LLM_RPM=30`, `MAX_CONCURRENT=8`. Verified live: tasks complete steadily, real
+coherent multi-step output. NOTE: NVIDIA's catalog has **no Hermes/Nous model**,
+so the model isn't on-theme; the app is still Hermes Agora.
+
 Config lives in `.env` (gitignored; template in `.env.example`). Never commit
-keys. To run live: ensure `.env` has the key, then `npm run dev:all` and open
-`?feed=ws://127.0.0.1:8787`. The HUD shows the model name + `(live)`.
+keys. To run live: ensure `.env` has the provider's key, then `npm run dev:all`
+and open `?feed=ws://127.0.0.1:8787`. The HUD shows the model name + `(live)`.
 
 ### Local fallback (owner's other machine, RTX 3090 24GB)
 If hosted free models are too throttled, run locally with Ollama

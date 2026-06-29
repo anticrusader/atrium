@@ -27,18 +27,32 @@ const TICK_MS = Number(process.env.TICK_MS ?? 1100)
 // Choose the executor: a real LLM if a key is configured, else the simulation.
 // The WHOLE fleet shares this one executor (and its rate limiter).
 function buildExecutor() {
-  const key = process.env.OPENROUTER_API_KEY || process.env.LLM_API_KEY || process.env.GROQ_API_KEY
-  const baseURL = process.env.LLM_BASE_URL || 'https://openrouter.ai/api/v1'
-  const model = process.env.LLM_MODEL || 'nousresearch/hermes-3-llama-3.1-405b:free'
+  // Provider-aware: pick the right key + default base URL for LLM_PROVIDER.
+  // All these providers are OpenAI-compatible, so only the key/URL/model differ.
+  const provider = (process.env.LLM_PROVIDER || 'openrouter').toLowerCase()
+  const keyByProvider = {
+    nvidia: process.env.NVIDIA_API_KEY,
+    openrouter: process.env.OPENROUTER_API_KEY,
+    groq: process.env.GROQ_API_KEY,
+  }
+  const baseByProvider = {
+    nvidia: 'https://integrate.api.nvidia.com/v1',
+    openrouter: 'https://openrouter.ai/api/v1',
+    groq: 'https://api.groq.com/openai/v1',
+    ollama: 'http://localhost:11434/v1',
+  }
+  const key = process.env.LLM_API_KEY || keyByProvider[provider] || process.env.OPENROUTER_API_KEY
+  const baseURL = process.env.LLM_BASE_URL || baseByProvider[provider] || baseByProvider.openrouter
+  const model = process.env.LLM_MODEL || 'meta/llama-3.3-70b-instruct'
   const rpm = Number(process.env.LLM_RPM ?? 15)
   if (!key) {
-    console.log('  [executor] no API key found → simulated work (set OPENROUTER_API_KEY in .env)')
+    console.log(`  [executor] no API key for provider "${provider}" → simulated work (check .env)`)
     return { executor: null, label: 'simulation' }
   }
   const ex = makeLLMExecutor({ apiKey: key, baseURL, model, rpm })
-  console.log(`  [executor] LIVE — ${ex.info.models.length} model(s), ${rpm} req/min shared across the fleet`)
+  console.log(`  [executor] LIVE (${provider}) — ${ex.info.models.length} model(s), ${rpm} req/min shared across the fleet`)
   ex.info.models.forEach((m, i) => console.log(`     ${i === 0 ? '▶' : ' '} ${m}`))
-  // Label shows the primary (on-theme) model; the executor rotates on 429.
+  // Label shows the primary model; the executor rotates to fallbacks on 429.
   return { executor: ex, label: ex.info.models[0].split('/').pop() }
 }
 
