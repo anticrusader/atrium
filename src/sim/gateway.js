@@ -71,10 +71,10 @@ export class MockGateway extends Emitter {
     for (let i = 0; i < 8; i++) this._newTask()
   }
 
-  _newAgent(i) {
+  _newAgent(i, name) {
     return {
       id: `a${i.toString().padStart(3, '0')}`,
-      name: `${pick(FIRST)} ${pick(LAST)}`,
+      name: name || `${pick(FIRST)} ${pick(LAST)}`,
       model: pick(MODELS), platform: pick(PLATFORMS),
       zone: pick(ZONES).key, status: 'idle', task: 'idle',
       taskId: null, uptime: r(86400), _walk: 0, _beat: 0,
@@ -88,8 +88,8 @@ export class MockGateway extends Emitter {
     // orchestrator backend (?feed=ws://...).
     const isResearch = opts.kind === 'research'
     const isFactcheck = opts.kind === 'factcheck'
-    const topic = isResearch ? pick(['tardigrades', 'black holes', 'the Silk Road', 'CRISPR', 'photosynthesis']) : null
-    const claim = isFactcheck ? pick(['Honey never spoils', 'Sharks are mammals', 'Bananas grow on trees']) : null
+    const topic = isResearch ? (opts.topic || pick(['tardigrades', 'black holes', 'the Silk Road', 'CRISPR', 'photosynthesis'])) : null
+    const claim = isFactcheck ? (opts.claim || pick(['Honey never spoils', 'Sharks are mammals', 'Bananas grow on trees'])) : null
     let title = opts.title
     if (!title) title = isResearch ? `research: ${topic}` : isFactcheck ? `fact-check: ${claim}` : pick(TASK_TITLES)
     const t = {
@@ -116,6 +116,7 @@ export class MockGateway extends Emitter {
   send(type, payload = {}) {
     switch (type) {
       case COMMAND.SPAWN: {
+        if (payload.name) { this._agents.push(this._newAgent(this._agents.length, payload.name)); break }
         const n = payload.count ?? 1
         for (let i = 0; i < n; i++) this._agents.push(this._newAgent(this._agents.length))
         break

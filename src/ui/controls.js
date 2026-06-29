@@ -44,14 +44,25 @@ export class Controls {
       <button data-act="auto" title="Toggle the auto-dispatcher">auto: <b>on</b></button>
       <button data-act="reset" class="ghost" title="Clear the board">reset</button>
     `
+    // Ask for a value; blank/cancel → null (so the server picks a random one).
+    const ask = (label) => { const v = window.prompt(label); return v && v.trim() ? v.trim() : null }
+
     this.toolbar.addEventListener('click', (e) => {
       const b = e.target.closest('button'); if (!b) return
       const act = b.dataset.act
-      if (act === 'spawn') this.send(COMMAND.SPAWN, { count: 1 })
-      else if (act === 'task') this.send(COMMAND.CREATE_TASK, {})
-      else if (act === 'research') this.send(COMMAND.CREATE_TASK, { kind: 'research' })
-      else if (act === 'factcheck') this.send(COMMAND.CREATE_TASK, { kind: 'factcheck' })
-      else if (act === 'reset') this.send(COMMAND.RESET, {})
+      if (act === 'spawn') {
+        const name = ask('Name your new agent (blank = random):')
+        this.send(COMMAND.SPAWN, name ? { name } : { count: 1 })
+      } else if (act === 'task') {
+        const title = ask('Task title (blank = random):')
+        this.send(COMMAND.CREATE_TASK, title ? { title } : {})
+      } else if (act === 'research') {
+        const topic = ask('Topic to research on Wikipedia (blank = random):')
+        this.send(COMMAND.CREATE_TASK, topic ? { kind: 'research', topic } : { kind: 'research' })
+      } else if (act === 'factcheck') {
+        const claim = ask('Claim to fact-check (blank = random):')
+        this.send(COMMAND.CREATE_TASK, claim ? { kind: 'factcheck', claim } : { kind: 'factcheck' })
+      } else if (act === 'reset') this.send(COMMAND.RESET, {})
       else if (act === 'auto') {
         this._auto = !this._auto
         b.querySelector('b').textContent = this._auto ? 'on' : 'off'

@@ -66,8 +66,11 @@ falls back to the in-browser simulation.
 - Hover any agent for model / platform / status / task / uptime.
 
 **Drive (orchestration)**
-- **Toolbar** (top): `+ agent`, `+ task`, `auto: on/off` (the dispatcher),
-  `reset`.
+- **Toolbar** (top): `+ agent`, `+ task`, `+ research`, `+ fact-check`,
+  `auto: on/off` (the dispatcher), `reset`. The create buttons **prompt you for
+  input** — name your own agent, type a task title, a research topic, or a claim
+  to fact-check (leave blank for a random one). Your input flows straight into
+  the real pipeline (e.g. a typed topic is the actual Wikipedia search).
 - **Click an agent** to select it, then from its panel: **pause / resume**,
   **assign** the next task, **send to** any zone, or **remove** it.
 - Or from the browser console: `__agora.gateway.send('spawn', { count: 5 })`.

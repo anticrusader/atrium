@@ -78,11 +78,16 @@ export class Orchestrator {
   spawn(count = 1, opts = {}) {
     const created = []
     for (let i = 0; i < count; i++) {
-      const a = new Agent({ executor: this.executor, zone: pick(ZONE_KEYS) })
+      // A name is only applied when spawning a single agent.
+      const name = opts.name && count === 1 ? opts.name : undefined
+      const a = new Agent({ executor: this.executor, zone: pick(ZONE_KEYS), name })
       this.agents.set(a.id, a)
       created.push(a)
     }
-    if (!opts.silent) this._log({ who: 'orchestrator', verb: 'spawned', what: `${count} agent(s)` })
+    if (!opts.silent) {
+      const what = opts.name && count === 1 ? opts.name : `${count} agent(s)`
+      this._log({ who: 'orchestrator', verb: 'spawned', what })
+    }
     return created
   }
 
@@ -116,7 +121,8 @@ export class Orchestrator {
       ti = title || `research: ${tp}`
       zn = 'library'
     } else if (k === 'factcheck') {
-      const c = cl ? { claim: cl, topic: tp } : pick(CLAIMS)
+      // A user-typed claim without a subject: search Wikipedia by the claim text.
+      const c = cl ? { claim: cl, topic: tp || cl } : pick(CLAIMS)
       cl = c.claim; tp = c.topic
       ti = title || `fact-check: ${cl}`
       zn = 'jira'
@@ -217,7 +223,7 @@ export class Orchestrator {
   // Generic dispatch entry used by the WS layer.
   apply(type, payload = {}) {
     switch (type) {
-      case 'spawn': this.spawn(payload.count ?? 1); return true
+      case 'spawn': this.spawn(payload.name ? 1 : (payload.count ?? 1), { name: payload.name }); return true
       case 'kill': return this.kill(payload.agentId)
       case 'assign': return this.assign(payload.agentId, payload.taskId)
       case 'create_task': this.createTask(payload); return true
