@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hermes Agora — a living 3D office for your agents</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <!-- The Three.js canvas mounts here -->
+    <div id="stage"></div>
+
+    <!-- HUD overlay (built imperatively in src/ui/hud.js) -->
+    <div id="hud" class="hud"></div>
+
+    <!-- Loading veil -->
+    <div id="boot" class="boot">
+      <div class="boot__mark">HERMES <span>//</span> AGORA</div>
+      <div class="boot__bar"><div class="boot__fill"></div></div>
+      <div class="boot__msg">warming up the gateway…</div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

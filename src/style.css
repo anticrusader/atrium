@@ -1,0 +1,319 @@
+:root {
+  --bg: #05070d;
+  --panel: rgba(10, 16, 28, 0.72);
+  --panel-edge: rgba(120, 200, 255, 0.18);
+  --ink: #e8f1ff;
+  --ink-dim: #8aa0bd;
+  --teal: #2fe6d6;
+  --green: #57e08a;
+  --amber: #ffcf5c;
+  --red: #ff6b7a;
+  --accent: #5ab8ff;
+  --mono: "SFMono-Regular", ui-monospace, "JetBrains Mono", "Consolas", monospace;
+  --sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+#stage {
+  position: fixed;
+  inset: 0;
+}
+
+#stage canvas { display: block; }
+
+/* ---------- HUD ---------- */
+.hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+  font-family: var(--mono);
+}
+
+.hud__panel {
+  position: absolute;
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-radius: 12px;
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+}
+
+/* Top-left brand + status */
+.brand {
+  top: 18px; left: 18px;
+  padding: 14px 16px;
+  min-width: 230px;
+}
+.brand__mark {
+  font-size: 16px;
+  letter-spacing: 2px;
+  font-weight: 700;
+}
+.brand__mark span { color: var(--teal); }
+.brand__sub {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--ink-dim);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 10px var(--green);
+  animation: pulse 2s ease-in-out infinite;
+}
+.brand__ver {
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--ink-dim);
+  letter-spacing: 0.5px;
+}
+
+/* Top-right host stats */
+.host {
+  top: 18px; right: 18px;
+  padding: 14px 16px;
+  width: 240px;
+}
+.host__title, .roster__title, .focus__title {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--ink-dim);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.meter { margin-bottom: 10px; }
+.meter:last-child { margin-bottom: 0; }
+.meter__row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+.meter__row b { font-weight: 600; }
+.meter__track {
+  height: 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.meter__fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.6s ease;
+}
+
+/* Bottom-left agent counts + sections */
+.roster {
+  bottom: 18px; left: 18px;
+  padding: 14px 16px;
+  min-width: 230px;
+}
+.roster__big {
+  font-size: 28px;
+  font-weight: 700;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.roster__big small {
+  font-size: 12px;
+  color: var(--ink-dim);
+  font-weight: 400;
+}
+.roster__active { color: var(--teal); }
+.sections {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chip {
+  font-size: 10px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-edge);
+  color: var(--ink-dim);
+}
+.chip b { color: var(--ink); font-weight: 600; }
+
+/* Bottom-right focus / activity feed */
+.focus {
+  bottom: 18px; right: 18px;
+  padding: 14px 16px;
+  width: 320px;
+  max-height: 230px;
+}
+.feed { margin: 0; padding: 0; list-style: none; }
+.feed li {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  display: flex;
+  gap: 8px;
+}
+.feed li:last-child { border-bottom: none; }
+.feed .who { color: var(--ink); font-weight: 600; min-width: 64px; }
+.feed .verb { color: var(--accent); }
+
+/* Hint footer (bottom-center) */
+.hint {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: var(--ink-dim);
+  letter-spacing: 1px;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+/* Selected-agent tooltip follows the mouse / agent */
+.tag {
+  position: absolute;
+  transform: translate(-50%, -120%);
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-radius: 8px;
+  padding: 6px 9px;
+  font-size: 10px;
+  white-space: nowrap;
+  pointer-events: none;
+  display: none;
+  z-index: 11;
+}
+.tag b { color: var(--teal); }
+
+/* ---------- Toolbar (top-center) ---------- */
+.toolbar {
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 10px;
+  display: flex;
+  gap: 8px;
+}
+.toolbar button, .agentctl button {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink);
+  background: rgba(90, 184, 255, 0.12);
+  border: 1px solid var(--panel-edge);
+  border-radius: 8px;
+  padding: 6px 11px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.05s;
+}
+.toolbar button:hover, .agentctl button:hover { background: rgba(90, 184, 255, 0.28); }
+.toolbar button:active, .agentctl button:active { transform: translateY(1px); }
+.toolbar button b { color: var(--teal); }
+.toolbar button.ghost { background: transparent; color: var(--ink-dim); }
+.agentctl button.danger { background: rgba(255, 107, 122, 0.14); border-color: rgba(255,107,122,0.3); }
+.agentctl button.danger:hover { background: rgba(255, 107, 122, 0.3); }
+
+/* ---------- Agent control panel (under brand) ---------- */
+.agentctl {
+  top: 128px; left: 18px;
+  width: 246px;
+  padding: 13px 15px;
+}
+.agentctl__name { font-size: 14px; font-weight: 700; }
+.agentctl__meta { font-size: 10px; color: var(--ink-dim); margin-top: 3px; }
+.agentctl__row { display: flex; gap: 6px; margin-top: 11px; }
+.agentctl__row button { flex: 1; padding: 6px 4px; }
+.agentctl__label {
+  font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--ink-dim); margin: 12px 0 6px;
+}
+.agentctl__zones { display: flex; flex-wrap: wrap; gap: 5px; }
+.agentctl button.mini {
+  font-size: 9px; padding: 4px 7px; border-radius: 6px;
+  background: rgba(255,255,255,0.05);
+}
+
+/* ---------- Task board (right) ---------- */
+.board {
+  top: 18px; right: 274px;
+  width: 250px;
+  padding: 13px 15px;
+}
+.board__cols { display: flex; justify-content: space-between; margin-bottom: 10px; }
+.board__col { text-align: center; flex: 1; }
+.board__col span { font-size: 22px; font-weight: 700; display: block; }
+.board__col small { font-size: 9px; color: var(--ink-dim); }
+.board__hot { color: var(--amber); }
+.board__ok { color: var(--green); }
+.board__list { list-style: none; margin: 0; padding: 0; }
+.board__list li {
+  font-size: 10px; padding: 4px 0;
+  display: flex; align-items: center; gap: 8px;
+}
+.bd-title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink); }
+.bd-track { width: 64px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.08); overflow: hidden; }
+.bd-fill { display: block; height: 100%; background: linear-gradient(90deg, var(--teal), var(--accent)); transition: width 0.5s; }
+.bd-empty { color: var(--ink-dim); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* ---------- Boot veil ---------- */
+.boot {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: radial-gradient(circle at 50% 40%, #0a1322, #05070d 70%);
+  transition: opacity 0.6s ease;
+  font-family: var(--mono);
+}
+.boot.hidden { opacity: 0; pointer-events: none; }
+.boot__mark {
+  font-size: 22px;
+  letter-spacing: 4px;
+  font-weight: 700;
+}
+.boot__mark span { color: var(--teal); }
+.boot__bar {
+  width: 220px; height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.boot__fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--teal), var(--accent));
+  animation: fill 1.4s ease forwards;
+}
+.boot__msg { font-size: 11px; color: var(--ink-dim); }
+
+@keyframes fill { to { width: 100%; } }
+
+@media (max-width: 720px) {
+  .focus { display: none; }
+  .host { width: 190px; }
+}
