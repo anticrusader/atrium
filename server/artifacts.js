@@ -20,6 +20,7 @@ const KIND_TITLE = {
   factcheck: 'Fact-Check (stage 1)',
   verify: 'Independent Verification (stage 2)',
   email: 'Email Draft',
+  custom: 'Specialist Output',
 }
 
 const slug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 50)

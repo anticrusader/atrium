@@ -12,7 +12,7 @@
 // loop. Everything else is policy plugged into step 2.
 
 import { Agent, simulatedExecutor, logTask, setAgentCounter } from './agent-runtime.js'
-import { STATUS, TASK_STATE, ZONE_KEYS, SKILLS, SKILL_FOR_KIND } from './protocol.js'
+import { STATUS, TASK_STATE, ZONE_KEYS, SKILLS, SKILL_FOR_KIND, requiredSkill } from './protocol.js'
 import { saveArtifact } from './artifacts.js'
 
 const TASK_TITLES = [
@@ -67,6 +67,10 @@ export class Orchestrator {
   constructor(opts = {}) {
     this.agents = new Map() // id -> Agent
     this.tasks = new Map()  // id -> task record
+    // Custom prompt-skills authored from the dashboard: key -> { key, name, system }.
+    // A "skill" with no code — just a name + a system prompt (the expertise). The
+    // executor's customStep runs the model with that prompt. See defineSkill().
+    this.customSkills = new Map()
     this.executor = opts.executor ?? simulatedExecutor
     this.autoAssign = opts.autoAssign ?? true
     // WIP limit: cap how many tasks run AT ONCE. With a rate-limited model, 18
@@ -101,6 +105,7 @@ export class Orchestrator {
       tasks: this._wireTasks(),
       completed: this._completed,
       autoAssign: this.autoAssign,
+      customSkills: [...this.customSkills.values()],
     }
   }
 
@@ -119,7 +124,15 @@ export class Orchestrator {
       a.uptime = rec.uptime || 0
       this.agents.set(a.id, a)
     }
-    for (const t of state.tasks || []) this.tasks.set(t.id, t)
+    for (const t of state.tasks || []) {
+      // A persisted custom task lost its `_system` (stripped from the wire/state);
+      // re-attach it from the restored skill registry so it can still run.
+      if (t.kind === 'custom' && t.skill && !t._system) {
+        t._system = (state.customSkills || []).find((s) => s.key === t.skill)?.system
+      }
+      this.tasks.set(t.id, t)
+    }
+    for (const s of state.customSkills || []) this.customSkills.set(s.key, s)
     this._completed = state.completed || 0
     if (typeof state.autoAssign === 'boolean') this.autoAssign = state.autoAssign
 
@@ -153,6 +166,21 @@ export class Orchestrator {
     return created
   }
 
+  // Author a CUSTOM prompt-skill from the dashboard: a name + a system prompt
+  // (the expertise). No code — the executor's customStep runs the model with it.
+  // Returns the stored skill record, or null if invalid.
+  defineSkill({ key, name, system } = {}) {
+    const nm = String(name || '').trim()
+    const sys = String(system || '').trim()
+    let k = String(key || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+    if (!k) k = nm.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+    if (!k || !nm || !sys) return null
+    const rec = { key: k, name: nm, system: sys }
+    this.customSkills.set(k, rec)
+    this._log({ who: 'orchestrator', verb: 'skill defined', what: `${nm} (${k})` })
+    return rec
+  }
+
   // Grant/replace an agent's skills (capabilities). Lets an operator turn an
   // existing generalist into a specialist without re-spawning.
   setSkills(agentId, skills) {
@@ -176,7 +204,7 @@ export class Orchestrator {
     return true
   }
 
-  createTask({ title, zone, stage, parent, kind, topic, claim, finding, brief } = {}, opts = {}) {
+  createTask({ title, zone, stage, parent, kind, topic, claim, finding, brief, skill } = {}, opts = {}) {
     _taskSeq += 1
     // REAL task kinds (see server/research.js):
     //   research  — look up a topic on Wikipedia, summarize it (library)
@@ -212,6 +240,14 @@ export class Orchestrator {
     } else if (k === 'email') {
       ti = title || 'email: triage inbox + draft a reply'
       zn = 'office'
+    } else if (k === 'custom') {
+      // A task for a user-authored prompt-skill. Route by its skill key; carry
+      // the skill's system prompt on the (wire-stripped) `_system` field so the
+      // executor is self-contained.
+      const sk = this.customSkills.get(skill)
+      br = br || 'do your specialist work'
+      ti = title || `${sk ? sk.name : skill}: ${br}`
+      zn = (zone && ZONE_KEYS.includes(zone)) ? zone : 'office'
     } else {
       ti = title || pick(TASK_TITLES)
       zn = (zone && ZONE_KEYS.includes(zone)) ? zone : pick(TASK_ZONE)
@@ -230,8 +266,12 @@ export class Orchestrator {
       topic: tp,              // real subject (research / factcheck)
       claim: cl,              // the claim under test (factcheck / verify)
       finding: finding ?? null, // stage-1 verdict carried into a verify task
-      brief: br,              // the process to automate (rpa-design)
+      brief: br,              // the process to automate (rpa-design / custom)
+      skill: k === 'custom' ? skill : undefined, // required skill for a custom task
     }
+    // The custom skill's system prompt rides server-side only (`_` → stripped
+    // from the wire by _wireTasks); the executor reads it in customStep.
+    if (k === 'custom') task._system = this.customSkills.get(skill)?.system
     this.tasks.set(task.id, task)
     if (!opts.silent) this._log({ who: 'board', verb: 'new task', what: task.title })
     return task
@@ -258,9 +298,9 @@ export class Orchestrator {
       return
     }
 
-    // Skill-gated specialist work (rpa-design, email) stands on its own — don't
-    // tack on a generic narrated "review:" follow-up that a generalist fakes.
-    if (SKILL_FOR_KIND[t.kind]) return
+    // Skill-gated specialist work (rpa-design, email, custom) stands on its own —
+    // don't tack on a generic narrated "review:" follow-up that a generalist fakes.
+    if (requiredSkill(t)) return
 
     if (Math.random() > 0.55) return // ~45% of other finished work gets handed off
     // Strip a "research:"/"fact-check:" prefix so we don't get "QA: research: X".
@@ -333,6 +373,7 @@ export class Orchestrator {
       case 'move': return this.move(payload.agentId, payload.zone)
       case 'rename': return this.rename(payload.agentId, payload.name)
       case 'set_skills': return this.setSkills(payload.agentId, payload.skills)
+      case 'define_skill': return !!this.defineSkill(payload)
       case 'set_auto': this.setAuto(payload.enabled); return true
       case 'reset': this.reset(); return true
       default: return false
@@ -356,7 +397,7 @@ export class Orchestrator {
     const rank = (t) =>
       (t.stage ?? 1) * 10 +
       (t.kind === 'verify' ? 5
-        : SKILL_FOR_KIND[t.kind] ? 4              // skill-gated specialist work
+        : requiredSkill(t) ? 4                    // skill-gated specialist work
         : t.kind === 'factcheck' || t.kind === 'research' ? 3
         : 0)
     const backlog = [...this.tasks.values()]
@@ -366,7 +407,7 @@ export class Orchestrator {
       if (slots <= 0 || !idlePool.length) break
       // A skill-gated task may ONLY go to an agent that owns the skill. Honor
       // _exclude too (e.g. a verify task must not go to the stage-1 agent).
-      const reqSkill = SKILL_FOR_KIND[task.kind]
+      const reqSkill = requiredSkill(task)
       const idx = idlePool.findIndex(
         (a) => a.hasSkill(reqSkill) && (!task._exclude || a.name !== task._exclude),
       )
@@ -417,7 +458,7 @@ export class Orchestrator {
           // flood server/outputs/ with dozens of demo artifacts nobody asked for.
           // (They still show in the UI feed + task detail; they're just not saved.)
           const t = this.tasks.get(line.taskId)
-          if (t && !t.artifact && SKILL_FOR_KIND[t.kind]) {
+          if (t && !t.artifact && requiredSkill(t)) {
             try {
               const path = saveArtifact(t)
               if (path) { t.artifact = path; events.push({ who: 'archive', verb: 'saved', what: `${t.title} → ${path}` }) }
@@ -455,11 +496,17 @@ export class Orchestrator {
       host,
       active,
       completed: this._completed,
+      skills: this._skillCatalog(), // custom prompt-skills, so the UI can list them
       // Keep a generous window: with up to maxConcurrent agents emitting a line
       // per tick (plus board/handoff lines), a small slice would silently drop
       // the earliest agents' events (e.g. a fact-check verdict).
       events: events.slice(-16),
     }
+  }
+
+  // Custom prompt-skills for the wire (key + name only — never the prompt body).
+  _skillCatalog() {
+    return [...this.customSkills.values()].map((s) => ({ key: s.key, name: s.name }))
   }
 
   // Serialize tasks for the wire, dropping bulky internal fields (e.g. the
@@ -480,6 +527,7 @@ export class Orchestrator {
       tasks: this._wireTasks(),
       host: this._host(metricsSample, active),
       completed: this._completed,
+      skills: this._skillCatalog(),
       version: this.version,
     }
   }

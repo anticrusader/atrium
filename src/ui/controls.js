@@ -56,6 +56,7 @@ export class Controls {
     this.toolbar.innerHTML = `
       <button data-act="spawn" title="Create a new agent (you can name it)">+ agent</button>
       <button data-act="specialist" title="Spawn a SPECIALIST agent with a skill (rpa-architect / email)">+ specialist</button>
+      <button data-act="skill" title="Design a NEW skill from a name + expertise prompt, then put a specialist on it">+ skill</button>
       <button data-act="task" title="Add a simulated task (you can title it)">+ task</button>
       <button data-act="research" title="Add a REAL research task (live Wikipedia lookup + summary)">+ research</button>
       <button data-act="factcheck" title="Add a REAL fact-check (a 2nd agent independently verifies)">+ fact-check</button>
@@ -76,6 +77,18 @@ export class Controls {
           const name = ask('Name this specialist (blank = auto):')
           this.send(COMMAND.SPAWN, { name: name || `Specialist · ${s}`, skills: [s] })
         }
+      }
+      else if (act === 'skill') {
+        // Design a brand-new skill from the page: a name + the expertise (system
+        // prompt). We define it, put a fresh specialist on it, and optionally
+        // give that specialist a first task — no code required.
+        const name = ask('Name the new skill (e.g. "SQL Expert", "Legal Reviewer"):'); if (!name) return
+        const system = ask('Describe its expertise / instructions (this becomes the agent\'s system prompt):'); if (!system) return
+        const key = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+        this.send(COMMAND.DEFINE_SKILL, { key, name: name.trim(), system })
+        this.send(COMMAND.SPAWN, { name: name.trim(), skills: [key] })
+        const brief = ask(`Give "${name.trim()}" a first task now (blank = skip):`)
+        if (brief) this.send(COMMAND.CREATE_TASK, { kind: 'custom', skill: key, brief })
       }
       else if (act === 'task') { const title = ask('Task title (blank = random):'); this.send(COMMAND.CREATE_TASK, title ? { title } : {}) }
       else if (act === 'research') { const topic = ask('Topic to research on Wikipedia (blank = random):'); this.send(COMMAND.CREATE_TASK, topic ? { kind: 'research', topic } : { kind: 'research' }) }

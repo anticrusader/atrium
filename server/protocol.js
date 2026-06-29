@@ -67,6 +67,7 @@ export const COMMAND = Object.freeze({
   MOVE: 'move',             // { agentId, zone }     send an agent to a zone
   RENAME: 'rename',         // { agentId, name }     rename an agent
   SET_SKILLS: 'set_skills', // { agentId, skills }   set an agent's skills (capabilities)
+  DEFINE_SKILL: 'define_skill', // { key, name, system } author a custom prompt-skill
   SET_AUTO: 'set_auto',     // { enabled }           toggle the auto-dispatcher
   RESET: 'reset',           // {}                    clear tasks, idle everyone
 })
@@ -86,11 +87,18 @@ export const SKILLS = Object.freeze({
   EMAIL: 'email',
 })
 
-// Which skill a task kind REQUIRES (kind → skill). Used by the dispatcher.
+// Which skill a BUILT-IN task kind REQUIRES (kind → skill). Used by the
+// dispatcher. Custom prompt-skills authored from the page use kind `custom` and
+// carry their required skill on `task.skill` instead (see Orchestrator).
 export const SKILL_FOR_KIND = Object.freeze({
   'rpa-design': SKILLS.RPA_ARCHITECT,
   email: SKILLS.EMAIL,
 })
+
+// The required skill for ANY task: built-in map, or a custom task's own skill.
+export function requiredSkill(task) {
+  return SKILL_FOR_KIND[task.kind] || (task.kind === 'custom' ? task.skill : undefined)
+}
 
 // Build a command envelope. `id` lets the UI correlate the ACK.
 let _seq = 0

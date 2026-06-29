@@ -217,6 +217,24 @@ Created via **`+ RPA design`** (prompts for the process brief; samples in
 `RPA_BRIEFS`). Verified live on NVIDIA: produced a real invoice-processing→SAP
 architecture and an onboarding design.
 
+### Custom prompt-skills — DESIGN A SKILL ON THE PAGE — DONE, real
+The owner asked "is there a way to design a skill on the page?" — yes. A *knowledge*
+skill is just a name + a system prompt (the expertise); only tool-using skills
+(email) need code. So the dashboard's **`+ skill`** button lets you author one:
+type a skill name + the expertise, and it (1) `define_skill`s it, (2) spawns a
+specialist agent with that skill, (3) optionally gives it a first task — no code.
+- Stored in `Orchestrator.customSkills` (persisted in state; key+name sent on the
+  wire via `_skillCatalog()`, never the prompt body).
+- A `custom` task carries its required skill on `task.skill` and the authored
+  prompt on `task._system` (server-side only). `requiredSkill(task)` in
+  protocol.js unifies built-in (`SKILL_FOR_KIND`) + custom routing, so dispatch,
+  the missing-skill warning, handoff-suppression and artifact-saving all treat
+  custom skills like first-class specialists.
+- Executed by `server/custom-skill.js` `customStep` (the generic form of
+  `rpa.js` — one model call grounded in the user's prompt; result saved to a file).
+- Verified live: defined a "SQL Expert" from the wire → specialist produced a
+  correct composite-index recommendation → saved to `server/outputs/`.
+
 ### Skill: Outlook email — read + DRAFT-ONLY (`server/email.js`) — built, needs setup
 Skill key `email`, task kind `email`. Reads the Outlook inbox and DRAFTS a reply
 via Microsoft Graph; **never sends** (no `/send` call — drafts land in Drafts for

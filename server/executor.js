@@ -19,6 +19,7 @@
 import { researchStep, factCheckStep, verifyStep } from './research.js'
 import { rpaDesignStep } from './rpa.js'
 import { emailStep } from './email.js'
+import { customStep } from './custom-skill.js'
 
 const now = () => Date.now()
 
@@ -143,6 +144,7 @@ export function makeLLMExecutor(cfg) {
     if (task.kind === 'verify') return verifyStep({ task, chat, limiter })
     if (task.kind === 'rpa-design') return rpaDesignStep({ task, chat, limiter })
     if (task.kind === 'email') return emailStep({ task, chat, limiter })
+    if (task.kind === 'custom') return customStep({ task, chat, limiter })
     return narrationStep(agent, task)
   }
 
