@@ -12,3 +12,9 @@ dist/
 # Persisted runtime world (fleet + task board) — machine-local, not source.
 server/state.json
 server/state.json.tmp
+
+# Cached Microsoft Graph token for the email skill — a secret, never commit.
+server/.msgraph-token.json
+
+# Saved task deliverables (RPA designs, research summaries, …) — generated output.
+server/outputs/

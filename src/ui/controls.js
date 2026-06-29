@@ -55,9 +55,12 @@ export class Controls {
     this.toolbar = el('div', 'hud__panel toolbar')
     this.toolbar.innerHTML = `
       <button data-act="spawn" title="Create a new agent (you can name it)">+ agent</button>
+      <button data-act="specialist" title="Spawn a SPECIALIST agent with a skill (rpa-architect / email)">+ specialist</button>
       <button data-act="task" title="Add a simulated task (you can title it)">+ task</button>
       <button data-act="research" title="Add a REAL research task (live Wikipedia lookup + summary)">+ research</button>
       <button data-act="factcheck" title="Add a REAL fact-check (a 2nd agent independently verifies)">+ fact-check</button>
+      <button data-act="rpa" title="Ask the RPA Solution Architect to design an automation">+ RPA</button>
+      <button data-act="email" title="Email agent: read your Outlook inbox + draft a reply (never sends)">+ email</button>
       <button data-act="auto" title="Toggle the auto-dispatcher">auto: <b>on</b></button>
       <button data-act="reset" class="ghost" title="Clear the board">reset</button>
     `
@@ -66,9 +69,19 @@ export class Controls {
       const b = e.target.closest('button'); if (!b) return
       const act = b.dataset.act
       if (act === 'spawn') { const name = ask('Name your new agent (blank = random):'); this.send(COMMAND.SPAWN, name ? { name } : { count: 1 }) }
+      else if (act === 'specialist') {
+        const skill = ask('Skill for the new specialist (rpa-architect or email):')
+        if (skill) {
+          const s = skill.trim().toLowerCase()
+          const name = ask('Name this specialist (blank = auto):')
+          this.send(COMMAND.SPAWN, { name: name || `Specialist · ${s}`, skills: [s] })
+        }
+      }
       else if (act === 'task') { const title = ask('Task title (blank = random):'); this.send(COMMAND.CREATE_TASK, title ? { title } : {}) }
       else if (act === 'research') { const topic = ask('Topic to research on Wikipedia (blank = random):'); this.send(COMMAND.CREATE_TASK, topic ? { kind: 'research', topic } : { kind: 'research' }) }
       else if (act === 'factcheck') { const claim = ask('Claim to fact-check (blank = random):'); this.send(COMMAND.CREATE_TASK, claim ? { kind: 'factcheck', claim } : { kind: 'factcheck' }) }
+      else if (act === 'rpa') { const brief = ask('Describe the business process to automate (blank = sample):'); this.send(COMMAND.CREATE_TASK, brief ? { kind: 'rpa-design', brief } : { kind: 'rpa-design' }) }
+      else if (act === 'email') { this.send(COMMAND.CREATE_TASK, { kind: 'email' }) }
       else if (act === 'reset') this.send(COMMAND.RESET, {})
       else if (act === 'auto') {
         this._auto = !this._auto
@@ -187,7 +200,8 @@ export class Controls {
     const dot = li.querySelector('.dir__dot')
     dot.style.background = color
     dot.style.boxShadow = `0 0 6px ${color}`
-    li.querySelector('.dir__name').textContent = a.name
+    // Mark specialists (agents with skills) with a star in the directory list.
+    li.querySelector('.dir__name').textContent = (a.skills?.length ? '★ ' : '') + a.name
     const st = li.querySelector('.dir__st')
     st.textContent = a.status
     st.style.color = color
@@ -211,6 +225,7 @@ export class Controls {
     return `<div class="dir__detail">
         <div class="dir__meta">${esc(a.model)} · ${esc(a.platform)}</div>
         <div class="dir__meta">${a.status} — ${esc(a.task || 'idle')}</div>
+        <div class="dir__meta dir__skills">${this._skillsHtml(a)}</div>
         <div class="dir__meta">uptime ${fmtUptime(a.uptime)}</div>
         <div class="dir__acts">
           <button data-act="${paused ? 'resume' : 'pause'}">${paused ? '▶ resume' : '⏸ pause'}</button>
@@ -222,11 +237,19 @@ export class Controls {
       </div>`
   }
 
+  // Skills shown as small chips, or a hint to grant one.
+  _skillsHtml(a) {
+    const skills = a.skills || []
+    if (!skills.length) return 'skills: <span style="opacity:.6">generalist</span>'
+    return 'skills: ' + skills.map((s) => `<span class="skill-chip">${esc(s)}</span>`).join(' ')
+  }
+
   _updateDetail(det, a) {
     const m = det.querySelectorAll('.dir__meta')
     m[0].textContent = `${a.model} · ${a.platform}`
     m[1].textContent = `${a.status} — ${a.task || 'idle'}`
-    m[2].textContent = `uptime ${fmtUptime(a.uptime)}`
+    m[2].innerHTML = this._skillsHtml(a)
+    m[3].textContent = `uptime ${fmtUptime(a.uptime)}`
     const pr = det.querySelector('button[data-act="pause"], button[data-act="resume"]')
     if (pr) {
       const paused = a.status === 'paused'

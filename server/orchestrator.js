@@ -12,7 +12,8 @@
 // loop. Everything else is policy plugged into step 2.
 
 import { Agent, simulatedExecutor, logTask, setAgentCounter } from './agent-runtime.js'
-import { STATUS, TASK_STATE, ZONE_KEYS } from './protocol.js'
+import { STATUS, TASK_STATE, ZONE_KEYS, SKILLS, SKILL_FOR_KIND } from './protocol.js'
+import { saveArtifact } from './artifacts.js'
 
 const TASK_TITLES = [
   'summarize the thread', 'draft a release note', 'review PR #482', 'triage inbox',
@@ -46,6 +47,17 @@ const CLAIMS = [
   { claim: 'The Sahara is the largest desert on Earth', topic: 'Sahara' },
 ]
 
+// Sample business processes for the RPA Solution Architect to design an
+// automation for. A real user types their own via the "+ RPA design" button.
+const RPA_BRIEFS = [
+  'invoice processing: read PDF invoices from a shared mailbox and post them to SAP',
+  'employee onboarding: create AD accounts, mailboxes and Jira access from an HR form',
+  'monthly bank reconciliation between the ERP and three bank portals',
+  'extract data from supplier portals daily and consolidate into one Excel report',
+  'process insurance claims: validate, classify, and route to the right queue',
+  'sync new Salesforce opportunities into the finance system every hour',
+]
+
 const r = (n) => Math.floor(Math.random() * n)
 const pick = (a) => a[r(a.length)]
 
@@ -72,6 +84,9 @@ export class Orchestrator {
   // Fresh start: a small fleet + a small backlog.
   seed(fleet = 5) {
     for (let i = 0; i < fleet; i++) this.spawn(1, { silent: true })
+    // Two SPECIALISTS so skill-routed work has somewhere to go out of the box.
+    this.spawn(1, { silent: true, name: 'Sol · Solution Architect', skills: [SKILLS.RPA_ARCHITECT] })
+    this.spawn(1, { silent: true, name: 'Mira · Inbox Assistant', skills: [SKILLS.EMAIL] })
     for (let i = 0; i < 2; i++) this.createTask({}, { silent: true })
     this.createTask({ kind: 'research' }, { silent: true })
     this.createTask({ kind: 'factcheck' }, { silent: true })
@@ -95,7 +110,8 @@ export class Orchestrator {
     for (const rec of state.agents || []) {
       const a = new Agent({
         id: rec.id, name: rec.name, model: rec.model,
-        platform: rec.platform, zone: rec.zone, executor: this.executor,
+        platform: rec.platform, zone: rec.zone, skills: rec.skills,
+        executor: this.executor,
       })
       a.status = rec.status || STATUS.IDLE
       a.taskId = rec.taskId ?? null
@@ -122,17 +138,29 @@ export class Orchestrator {
   spawn(count = 1, opts = {}) {
     const created = []
     for (let i = 0; i < count; i++) {
-      // A name is only applied when spawning a single agent.
+      // A name + skills are only applied when spawning a single agent.
       const name = opts.name && count === 1 ? opts.name : undefined
-      const a = new Agent({ executor: this.executor, zone: pick(ZONE_KEYS), name })
+      const skills = count === 1 ? opts.skills : undefined
+      const a = new Agent({ executor: this.executor, zone: pick(ZONE_KEYS), name, skills })
       this.agents.set(a.id, a)
       created.push(a)
     }
     if (!opts.silent) {
       const what = opts.name && count === 1 ? opts.name : `${count} agent(s)`
-      this._log({ who: 'orchestrator', verb: 'spawned', what })
+      const tag = created[0]?.skills?.length ? ` [${created[0].skills.join(', ')}]` : ''
+      this._log({ who: 'orchestrator', verb: 'spawned', what: `${what}${tag}` })
     }
     return created
+  }
+
+  // Grant/replace an agent's skills (capabilities). Lets an operator turn an
+  // existing generalist into a specialist without re-spawning.
+  setSkills(agentId, skills) {
+    const a = this.agents.get(agentId)
+    if (!a || !Array.isArray(skills)) return false
+    a.skills = [...new Set(skills.filter((s) => typeof s === 'string' && s.trim()))]
+    this._log({ who: 'orchestrator', verb: 'skills set', what: `${a.name} → ${a.skills.join(', ') || '(none)'}` })
+    return true
   }
 
   kill(agentId) {
@@ -148,16 +176,20 @@ export class Orchestrator {
     return true
   }
 
-  createTask({ title, zone, stage, parent, kind, topic, claim, finding } = {}, opts = {}) {
+  createTask({ title, zone, stage, parent, kind, topic, claim, finding, brief } = {}, opts = {}) {
     _taskSeq += 1
     // REAL task kinds (see server/research.js):
     //   research  — look up a topic on Wikipedia, summarize it (library)
     //   factcheck — judge a CLAIM against Wikipedia (stage 1, jira floor)
     //   verify    — re-check a claim against an independent 2nd source (stage 2,
     //               conference hall) — created by the fact-check handoff
+    // SKILL-GATED kinds (require a matching specialist — see SKILL_FOR_KIND):
+    //   rpa-design — design a UiPath/RPA automation for a process (server/rpa.js)
+    //   email      — read the Outlook inbox + draft a reply (server/email.js)
     let k = kind || 'sim'
     let tp = topic ?? null
     let cl = claim ?? null
+    let br = brief ?? null
     let zn, ti
 
     if (k === 'research') {
@@ -173,6 +205,13 @@ export class Orchestrator {
     } else if (k === 'verify') {
       ti = title || `verify: ${cl ?? ''}`
       zn = 'conference'
+    } else if (k === 'rpa-design') {
+      br = br || pick(RPA_BRIEFS)
+      ti = title || `RPA design: ${br}`
+      zn = 'conference' // the solution architect works in the conference hall
+    } else if (k === 'email') {
+      ti = title || 'email: triage inbox + draft a reply'
+      zn = 'office'
     } else {
       ti = title || pick(TASK_TITLES)
       zn = (zone && ZONE_KEYS.includes(zone)) ? zone : pick(TASK_ZONE)
@@ -191,6 +230,7 @@ export class Orchestrator {
       topic: tp,              // real subject (research / factcheck)
       claim: cl,              // the claim under test (factcheck / verify)
       finding: finding ?? null, // stage-1 verdict carried into a verify task
+      brief: br,              // the process to automate (rpa-design)
     }
     this.tasks.set(task.id, task)
     if (!opts.silent) this._log({ who: 'board', verb: 'new task', what: task.title })
@@ -217,6 +257,10 @@ export class Orchestrator {
       events.push({ who: 'handoff', verb: 'handed off', what: `fact-check → independent verify of "${t.claim}"` })
       return
     }
+
+    // Skill-gated specialist work (rpa-design, email) stands on its own — don't
+    // tack on a generic narrated "review:" follow-up that a generalist fakes.
+    if (SKILL_FOR_KIND[t.kind]) return
 
     if (Math.random() > 0.55) return // ~45% of other finished work gets handed off
     // Strip a "research:"/"fact-check:" prefix so we don't get "QA: research: X".
@@ -280,7 +324,7 @@ export class Orchestrator {
   // Generic dispatch entry used by the WS layer.
   apply(type, payload = {}) {
     switch (type) {
-      case 'spawn': this.spawn(payload.name ? 1 : (payload.count ?? 1), { name: payload.name }); return true
+      case 'spawn': this.spawn((payload.name || payload.skills) ? 1 : (payload.count ?? 1), { name: payload.name, skills: payload.skills }); return true
       case 'kill': return this.kill(payload.agentId)
       case 'assign': return this.assign(payload.agentId, payload.taskId)
       case 'create_task': this.createTask(payload); return true
@@ -288,6 +332,7 @@ export class Orchestrator {
       case 'resume': return this.resume(payload.agentId)
       case 'move': return this.move(payload.agentId, payload.zone)
       case 'rename': return this.rename(payload.agentId, payload.name)
+      case 'set_skills': return this.setSkills(payload.agentId, payload.skills)
       case 'set_auto': this.setAuto(payload.enabled); return true
       case 'reset': this.reset(); return true
       default: return false
@@ -298,7 +343,7 @@ export class Orchestrator {
   // Policy: greedily match the oldest backlog task to any idle agent. This is
   // the simplest possible scheduler. Smarter policies would weigh agent skills,
   // task priority, locality, fairness — but they all slot in right here.
-  _dispatch() {
+  _dispatch(events = []) {
     if (!this.autoAssign) return
     // WIP limit: don't exceed maxConcurrent tasks in flight at once.
     const busy = [...this.agents.values()].filter((a) => a.taskId).length
@@ -306,19 +351,33 @@ export class Orchestrator {
     if (slots <= 0) return
     const idlePool = [...this.agents.values()].filter((a) => a.status === STATUS.IDLE)
     if (!idlePool.length) return
-    // Priority: stage-2 verify first (finish pipelines), then real work
-    // (research/factcheck) so it's promptly visible, then simulated tasks.
+    // Priority: stage-2 verify first (finish pipelines), then real/specialist
+    // work so it's promptly visible, then simulated tasks.
     const rank = (t) =>
       (t.stage ?? 1) * 10 +
-      (t.kind === 'verify' ? 5 : t.kind === 'factcheck' || t.kind === 'research' ? 3 : 0)
+      (t.kind === 'verify' ? 5
+        : SKILL_FOR_KIND[t.kind] ? 4              // skill-gated specialist work
+        : t.kind === 'factcheck' || t.kind === 'research' ? 3
+        : 0)
     const backlog = [...this.tasks.values()]
       .filter((t) => t.state === TASK_STATE.BACKLOG)
       .sort((a, b) => rank(b) - rank(a))
     for (const task of backlog) {
       if (slots <= 0 || !idlePool.length) break
-      // Honor _exclude (e.g. a verify task must not go to the stage-1 agent).
-      const idx = idlePool.findIndex((a) => !task._exclude || a.name !== task._exclude)
-      if (idx === -1) continue // only the excluded agent is free — wait a tick
+      // A skill-gated task may ONLY go to an agent that owns the skill. Honor
+      // _exclude too (e.g. a verify task must not go to the stage-1 agent).
+      const reqSkill = SKILL_FOR_KIND[task.kind]
+      const idx = idlePool.findIndex(
+        (a) => a.hasSkill(reqSkill) && (!task._exclude || a.name !== task._exclude),
+      )
+      if (idx === -1) {
+        // No eligible idle agent. If it's a skill the WHOLE fleet lacks, say so
+        // once so the board doesn't look mysteriously stuck.
+        if (reqSkill && ![...this.agents.values()].some((a) => a.hasSkill(reqSkill))) {
+          this._warnMissingSkill(reqSkill, events)
+        }
+        continue
+      }
       const a = idlePool.splice(idx, 1)[0]
       a.assign(task)
       this._log({ who: a.name, verb: 'picked up', what: task.title })
@@ -326,21 +385,48 @@ export class Orchestrator {
     }
   }
 
+  // Log a "no agent has skill X" warning at most once per ~30 ticks per skill,
+  // so a backlog of specialist work with no specialist is visible but not spammy.
+  _warnMissingSkill(skill, events) {
+    this._skillWarn ??= {}
+    const n = this.tick._n ?? 0
+    if (this._skillWarn[skill] != null && n - this._skillWarn[skill] < 30) return
+    this._skillWarn[skill] = n
+    const line = { who: 'orchestrator', verb: 'waiting', what: `no agent has skill "${skill}" — spawn or grant one` }
+    this._log(line)
+    events?.push(line) // also surface it on the wire so the UI feed shows it
+  }
+
   // ── The loop: one tick ───────────────────────────────────────────────────
   tick(metricsSample) {
-    // 2. DISPATCH
-    this._dispatch()
-
-    // 3. ADVANCE
+    // 3. ADVANCE (declare the event buffer first so DISPATCH can add to it)
     const events = []
+
+    // 2. DISPATCH (may push "no agent has skill X" warnings into events)
+    this._dispatch(events)
+
     for (const a of this.agents.values()) {
       const line = a.tick(this.tasks)
       if (line) {
         events.push(line)
         if (line.verb === 'completed') this._completed += 1
-        // When a task completes, maybe hand its result to a teammate. Pass the
-        // doer's name so a verify task goes to a DIFFERENT agent.
-        if (line.verb === 'completed' && line.taskId) this._maybeHandoff(line.taskId, events, line.who)
+        if (line.verb === 'completed' && line.taskId) {
+          // Deliberate SPECIALIST work (RPA designs, email drafts) leaves a real
+          // file, saved before the task is pruned so the deliverable isn't lost.
+          // We DON'T file the ambient research/fact-check trickle — that would
+          // flood server/outputs/ with dozens of demo artifacts nobody asked for.
+          // (They still show in the UI feed + task detail; they're just not saved.)
+          const t = this.tasks.get(line.taskId)
+          if (t && !t.artifact && SKILL_FOR_KIND[t.kind]) {
+            try {
+              const path = saveArtifact(t)
+              if (path) { t.artifact = path; events.push({ who: 'archive', verb: 'saved', what: `${t.title} → ${path}` }) }
+            } catch (err) { this._log({ who: 'archive', verb: 'save failed', what: err.message }) }
+          }
+          // Then maybe hand the result to a teammate. Pass the doer's name so a
+          // verify task goes to a DIFFERENT agent.
+          this._maybeHandoff(line.taskId, events, line.who)
+        }
       }
     }
     events.forEach((e) => this._log(e))

@@ -58,7 +58,7 @@ export const EVENT = Object.freeze({
 
 // ── COMMANDS: browser → orchestrator ────────────────────────────────────────
 export const COMMAND = Object.freeze({
-  SPAWN: 'spawn',           // { count? }            create new agent(s)
+  SPAWN: 'spawn',           // { count?, name?, skills? } create new agent(s)
   KILL: 'kill',             // { agentId }           remove an agent
   ASSIGN: 'assign',         // { agentId, taskId }   give a specific task to an agent
   CREATE_TASK: 'create_task', // { title?, zone? }   add a task to the backlog
@@ -66,8 +66,30 @@ export const COMMAND = Object.freeze({
   RESUME: 'resume',         // { agentId }
   MOVE: 'move',             // { agentId, zone }     send an agent to a zone
   RENAME: 'rename',         // { agentId, name }     rename an agent
+  SET_SKILLS: 'set_skills', // { agentId, skills }   set an agent's skills (capabilities)
   SET_AUTO: 'set_auto',     // { enabled }           toggle the auto-dispatcher
   RESET: 'reset',           // {}                    clear tasks, idle everyone
+})
+
+// ── SKILLS (agent capabilities) ──────────────────────────────────────────────
+// A "skill" is a capability an agent has. A task whose `kind` appears here may
+// ONLY be dispatched to an agent that owns the matching skill — this is how the
+// scheduler stops handing specialist work to a generalist. Task kinds NOT listed
+// here (research, factcheck, verify, sim) have no requirement: anyone can do them.
+//
+//   skill key      what the agent can do
+//   ───────────    ─────────────────────────────────────────────────────────
+//   rpa-architect  design UiPath/RPA automation solutions (solution architect)
+//   email          read the Outlook inbox + draft replies (never auto-sends)
+export const SKILLS = Object.freeze({
+  RPA_ARCHITECT: 'rpa-architect',
+  EMAIL: 'email',
+})
+
+// Which skill a task kind REQUIRES (kind → skill). Used by the dispatcher.
+export const SKILL_FOR_KIND = Object.freeze({
+  'rpa-design': SKILLS.RPA_ARCHITECT,
+  email: SKILLS.EMAIL,
 })
 
 // Build a command envelope. `id` lets the UI correlate the ACK.
@@ -92,6 +114,6 @@ export function isCommand(msg) {
 export function isZone(z) { return ZONE_KEYS.includes(z) }
 
 // The canonical agent record shape (documented here, produced by the runtime).
-//   { id, name, model, platform, zone, status, task, taskId, uptime }
+//   { id, name, model, platform, zone, status, task, taskId, uptime, skills }
 // The canonical task record shape:
 //   { id, title, zone, state, agentId, progress (0..1) }

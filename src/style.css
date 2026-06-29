@@ -210,7 +210,13 @@ html, body {
   transform: translateX(-50%);
   padding: 8px 10px;
   display: flex;
-  gap: 8px;
+  gap: 6px;
+  /* Stay clear of the side panels (brand left, host+board right). The centered
+     bar is bounded by the WIDER side (the board), so it can't slide under it;
+     when the viewport is too narrow to fit one row, the buttons wrap instead. */
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: calc(100vw - 1080px);
 }
 .toolbar button, .agentctl button {
   font-family: var(--mono);
@@ -287,6 +293,12 @@ html, body {
 .dir__st { font-size: 9px; text-transform: lowercase; }
 .dir__detail { padding: 2px 8px 10px; }
 .dir__meta { font-size: 10px; color: var(--ink-dim); margin-bottom: 3px; }
+.skill-chip {
+  display: inline-block; padding: 1px 6px; margin: 1px 2px 1px 0;
+  border-radius: 9px; font-size: 9px; letter-spacing: .02em;
+  color: #2fe6d6; background: rgba(47,230,214,.12);
+  border: 1px solid rgba(47,230,214,.35);
+}
 .dir__acts { display: flex; flex-wrap: wrap; gap: 5px; margin: 9px 0 7px; }
 .dir__acts button {
   font-family: var(--mono); font-size: 10px; color: var(--ink);

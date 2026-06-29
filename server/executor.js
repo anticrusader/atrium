@@ -17,6 +17,8 @@
 // `research` task does GENUINELY REAL work via researchStep (Wikipedia + model).
 
 import { researchStep, factCheckStep, verifyStep } from './research.js'
+import { rpaDesignStep } from './rpa.js'
+import { emailStep } from './email.js'
 
 const now = () => Date.now()
 
@@ -139,6 +141,8 @@ export function makeLLMExecutor(cfg) {
     if (task.kind === 'research') return researchStep({ task, chat, limiter })
     if (task.kind === 'factcheck') return factCheckStep({ task, chat, limiter })
     if (task.kind === 'verify') return verifyStep({ task, chat, limiter })
+    if (task.kind === 'rpa-design') return rpaDesignStep({ task, chat, limiter })
+    if (task.kind === 'email') return emailStep({ task, chat, limiter })
     return narrationStep(agent, task)
   }
 

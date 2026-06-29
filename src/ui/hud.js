@@ -140,6 +140,7 @@ export class Hud {
     if (parent) out.push(`<div class="tp__meta">↳ handed off from <span class="tp__link" data-taskid="${parent.id}">${esc(parent.title)}</span></div>`)
     if (t.finding) out.push(`<div class="tp__block"><div class="tp__lbl">verdict it received</div>${esc(t.finding)}</div>`)
     if (t.result) out.push(`<div class="tp__block"><div class="tp__lbl">result</div>${esc(t.result)}</div>`)
+    if (t.artifact) out.push(`<div class="tp__meta">📄 saved to <b style="color:var(--ink)">${esc(t.artifact)}</b></div>`)
 
     // Per-task activity timeline: who did what, in order.
     if (Array.isArray(t.log) && t.log.length) {

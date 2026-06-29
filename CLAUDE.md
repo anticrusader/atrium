@@ -185,10 +185,60 @@ Verified live on NVIDIA: e.g. Zephyr Dune ⚖️ CONTRADICTED → handoff → Ni
 summary extract, so a true claim can read as CONTRADICTED if the summary omits
 it — honest behavior ("the source doesn't support this"), not a bug.
 
+## Agent SKILLS + skill-based scheduling — DONE
+
+Agents are no longer interchangeable. Each `Agent` has a `skills: string[]`
+(capabilities). A task `kind` can REQUIRE a skill via `SKILL_FOR_KIND` in
+`server/protocol.js`; the dispatcher (`_dispatch`) only assigns a skill-gated
+task to an idle agent that owns the skill. Kinds NOT in the map (research /
+factcheck / verify / sim) stay open to anyone. This is the "skill-based
+scheduling" step that was on the list.
+
+- **A skill = a capability + routing.** Capability = a task kind with a real
+  `step()`; routing = `SKILL_FOR_KIND[kind]` gating which agent gets it.
+- Skills persist (in `toState`/`hydrate`) and ride the wire (`toRecord`). The
+  UI shows them as chips + a ★ on specialist rows; spawn one with **`+ specialist`**
+  (or `set_skills` command to grant an existing agent a skill). `seed()` creates
+  two specialists out of the box (a Solution Architect + an Inbox Assistant).
+- When skill-gated work has NO capable agent, `_warnMissingSkill` emits an
+  `orchestrator waiting: no agent has skill "X"` line **into the per-tick events**
+  (not just the internal feed), so the board explains itself instead of stalling
+  silently. Throttled to once / ~30 ticks / skill.
+
+### Skill: RPA / UiPath Solution Architect (`server/rpa.js`) — DONE, real
+Skill key `rpa-architect`, task kind `rpa-design`. Pure-expertise skill (no
+external creds): a senior-architect system prompt encodes real UiPath knowledge
+(REFramework, Orchestrator queues/assets/credential stores, attended/unattended,
+selector strategy, Document Understanding/AI Center, exception handling, SDLC).
+Runs in 2 real model calls over 2 ticks: **ANALYZE** the process → **DESIGN** the
+UiPath solution (feasibility, components, integration, risks, S/M/L estimate).
+Full architecture stored on `task.result`; feed shows `🧩 …` then `🏗️ …`.
+Created via **`+ RPA design`** (prompts for the process brief; samples in
+`RPA_BRIEFS`). Verified live on NVIDIA: produced a real invoice-processing→SAP
+architecture and an onboarding design.
+
+### Skill: Outlook email — read + DRAFT-ONLY (`server/email.js`) — built, needs setup
+Skill key `email`, task kind `email`. Reads the Outlook inbox and DRAFTS a reply
+via Microsoft Graph; **never sends** (no `/send` call — drafts land in Drafts for
+the user to review). Flow: FETCH inbox → TRIAGE (model picks the message most
+needing a reply) → DRAFT (model writes the body; `createReply` + PATCH saves it).
+- **Auth:** OAuth2 device-code flow (public client, no secret). One-time
+  `npm run email:login` caches a refresh token to `server/.msgraph-token.json`
+  (gitignored). The step auto-refreshes; degrades gracefully with a clear feed
+  note if unconfigured/unauthorized.
+- **Setup (user-side, required before it does anything):** register a public-
+  client Azure app with delegated Graph `Mail.Read` + `Mail.ReadWrite` +
+  `offline_access`; put its client ID in `.env` as `EMAIL_CLIENT_ID`
+  (`EMAIL_TENANT=consumers` for personal outlook.com). See the header of
+  `server/email.js`. Then spawn an `email`-skilled agent (`+ specialist`).
+- Status: code complete + gated; NOT yet verified live (needs the owner's Azure
+  registration + sign-in). The "draft only, never auto-send" decision is baked in.
+
 ## Possible NEXT STEPS (not done)
+- Finish the email skill: do the Azure app registration + `npm run email:login`,
+  spawn an `email` specialist, and verify a real draft lands in Drafts.
 - More real task kinds (web search via Tavily/Brave, run a shell command, etc.).
 - Use fuller article text (not just the summary) for deeper fact-checks.
-- Skill-based scheduling in `Orchestrator._dispatch()`.
 - Surface the *currently active* model (post-rotation) in the HUD; executor
   exposes `current()`.
 - Graceful degradation: when fully rate-limited, optionally let agents make slow

@@ -62,6 +62,9 @@ export class Agent {
     this.taskId = null
     this.task = 'idle'          // human-readable current activity
     this.uptime = 0
+    // Skills = capabilities this agent has (e.g. 'rpa-architect', 'email'). The
+    // dispatcher uses them to route specialist work; see Orchestrator._dispatch.
+    this.skills = Array.isArray(opts.skills) ? [...new Set(opts.skills)] : []
     this.executor = opts.executor ?? simulatedExecutor
 
     // internal timers
@@ -74,6 +77,8 @@ export class Agent {
   get busy() {
     return this.status !== STATUS.IDLE && this.status !== STATUS.PAUSED
   }
+
+  hasSkill(skill) { return !skill || this.skills.includes(skill) }
 
   // Operator controls -------------------------------------------------------
   pause() {
@@ -215,6 +220,7 @@ export class Agent {
       task: this.task,
       taskId: this.taskId,
       uptime: this.uptime,
+      skills: this.skills,
     }
   }
 
@@ -231,6 +237,7 @@ export class Agent {
       taskId: this.taskId,
       task: this.task,
       uptime: this.uptime,
+      skills: this.skills,
     }
   }
 }
