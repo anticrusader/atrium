@@ -12,9 +12,21 @@
 
 const UA = { 'User-Agent': 'HermesAgora/0.1 (educational orchestration demo)' }
 
+// Turn a natural-language question into a good search term, so a typed topic
+// like "what is loop engineering?" searches "loop engineering" (and lands on
+// the right article) instead of matching something unrelated.
+export function cleanQuery(s) {
+  const cleaned = String(s || '')
+    .replace(/^\s*(what|who|when|where|why|how|which)\s+(is|are|was|were|did|does|do)\s+/i, '')
+    .replace(/^\s*(what's|whats|who's|define|explain|tell me about|describe)\s+/i, '')
+    .replace(/\?+\s*$/, '')
+    .trim()
+  return cleaned || String(s || '')
+}
+
 async function wikiSearch(topic) {
   const url = `https://en.wikipedia.org/w/api.php?action=query&list=search` +
-    `&srsearch=${encodeURIComponent(topic)}&srlimit=1&format=json`
+    `&srsearch=${encodeURIComponent(cleanQuery(topic))}&srlimit=1&format=json`
   const res = await fetch(url, { headers: UA })
   if (!res.ok) return null
   const data = await res.json()

@@ -162,6 +162,7 @@ export class Agent {
         if (--this._beat > 0) return null
         // Complete the task and free up.
         task.state = TASK_STATE.DONE
+        task.doneBy = this.name // remember who finished it (for the task detail)
         task.agentId = null
         const title = task.title
         const doneId = task.id
@@ -184,10 +185,15 @@ export class Agent {
 
   // Serializable record for the wire.
   toRecord() {
+    // Report the REAL active model when running on a live LLM executor (the
+    // whole fleet shares it); fall back to the cosmetic label when simulated.
+    const realModel = typeof this.executor?.current === 'function'
+      ? this.executor.current().split('/').pop()
+      : this.model
     return {
       id: this.id,
       name: this.name,
-      model: this.model,
+      model: realModel,
       platform: this.platform,
       zone: this.zone,
       status: this.status,

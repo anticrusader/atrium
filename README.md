@@ -76,9 +76,15 @@ falls back to the in-browser simulation.
   (the two stay in sync) and expand its details + actions: **pause / resume**,
   **✎ rename**, **✕ remove**, **assign a task…** (pick a *specific* backlog task
   from the dropdown), and **send to zone…**.
-- **Task board** (top-right) lists the **backlog** (queued, assignable tasks)
-  plus in-progress tasks with progress bars. Turn `auto: off` to hand-assign
-  everything yourself.
+- **Task board** (top-right) lists the **backlog** (queued, assignable tasks),
+  in-progress tasks with progress bars, and recent done tasks. **Click any task**
+  to open its detail panel — kind, state, who's on it / who finished it, the
+  result (📚 summary / ⚖️ verdict), the step history, and handoff lineage. Turn
+  `auto: off` to hand-assign everything yourself.
+
+> The model shown on each agent (e.g. `llama-3.3-70b-instruct`) is the **real**
+> active model — the whole fleet shares one executor. The `· discord`/`· api`
+> tag next to it is cosmetic flavor (an imagined channel), not a real connection.
 - Or from the browser console: `__agora.gateway.send('spawn', { count: 5 })`.
 
 ---

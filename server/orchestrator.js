@@ -64,6 +64,7 @@ export class Orchestrator {
     this.maxConcurrent = opts.maxConcurrent ?? 6
     this.version = 'v0.1.0 · pre-release'
     this._feed = []         // recent activity lines
+    this._completed = 0     // cumulative completed count (done objects are pruned)
 
     // Seed a small fleet so the office isn't empty on first connect.
     const n = opts.fleet ?? 5
@@ -174,11 +175,13 @@ export class Orchestrator {
     }
 
     if (Math.random() > 0.55) return // ~45% of other finished work gets handed off
+    // Strip a "research:"/"fact-check:" prefix so we don't get "QA: research: X".
+    const base = t.title.replace(/^(research|fact-check):\s*/i, '')
     const followTitle = pick([
-      `review: ${t.title}`,
-      `write up: ${t.title}`,
-      `QA: ${t.title}`,
-      `summarize results of: ${t.title}`,
+      `review: ${base}`,
+      `write up: ${base}`,
+      `QA: ${base}`,
+      `summarize: ${base}`,
     ])
     const follow = this.createTask(
       { title: followTitle, zone: pick(['conference', 'jira', 'office']), stage: 2, parent: t.id },
@@ -289,12 +292,18 @@ export class Orchestrator {
       const line = a.tick(this.tasks)
       if (line) {
         events.push(line)
+        if (line.verb === 'completed') this._completed += 1
         // When a task completes, maybe hand its result to a teammate. Pass the
         // doer's name so a verify task goes to a DIFFERENT agent.
         if (line.verb === 'completed' && line.taskId) this._maybeHandoff(line.taskId, events, line.who)
       }
     }
     events.forEach((e) => this._log(e))
+
+    // Keep the wire bounded: retain only the most recent done tasks (the true
+    // cumulative count lives in this._completed).
+    const doneTasks = [...this.tasks.values()].filter((t) => t.state === TASK_STATE.DONE)
+    if (doneTasks.length > 40) for (const t of doneTasks.slice(0, doneTasks.length - 40)) this.tasks.delete(t.id)
 
     // keep a steady trickle of new work so the demo never stalls
     const backlogCount = [...this.tasks.values()].filter((t) => t.state === TASK_STATE.BACKLOG).length
@@ -314,6 +323,7 @@ export class Orchestrator {
       tasks: this._wireTasks(),
       host,
       active,
+      completed: this._completed,
       // Keep a generous window: with up to maxConcurrent agents emitting a line
       // per tick (plus board/handoff lines), a small slice would silently drop
       // the earliest agents' events (e.g. a fact-check verdict).
@@ -338,6 +348,7 @@ export class Orchestrator {
       agents,
       tasks: this._wireTasks(),
       host: this._host(metricsSample, active),
+      completed: this._completed,
       version: this.version,
     }
   }

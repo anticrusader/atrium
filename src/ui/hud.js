@@ -11,6 +11,8 @@ function el(tag, cls, html) {
   return n
 }
 
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+
 function meterColor(pct) {
   if (pct < 55) return 'var(--green)'
   if (pct < 80) return 'var(--amber)'
@@ -31,6 +33,9 @@ export class Hud {
     this.root = root
     this.version = 'v0.1.0 · pre-release'
     this._feed = []
+    this._agents = []        // latest roster (for task→agent name lookup)
+    this._tasks = []         // latest task list
+    this._openTaskId = null  // task whose detail panel is open
     this._build()
   }
 
@@ -83,10 +88,14 @@ export class Hud {
     // --- Hover tag ---
     this.tag = el('div', 'tag')
 
-    // --- Hint ---
-    this.hint = el('div', 'hint', 'drag to orbit · scroll to zoom · hover an agent')
+    // --- Task detail panel (opens when you click a task on the board) ---
+    this.taskPanel = el('div', 'hud__panel taskpanel')
+    this.taskPanel.style.display = 'none'
 
-    this.root.append(this.brand, this.host, this.roster, this.board, this.focus, this.tag, this.hint)
+    // --- Hint ---
+    this.hint = el('div', 'hint', 'drag to orbit · scroll to zoom · hover an agent · click a task')
+
+    this.root.append(this.brand, this.host, this.roster, this.board, this.focus, this.taskPanel, this.tag, this.hint)
 
     // Section chips
     const secWrap = this.root.querySelector('#r-sections')
@@ -96,6 +105,47 @@ export class Hud {
       this._chips[z.key] = c
       secWrap.appendChild(c)
     }
+
+    // Click a task row on the board → open its detail panel.
+    this.board.addEventListener('click', (e) => {
+      const row = e.target.closest('[data-taskid]')
+      if (row) this.openTask(row.dataset.taskid)
+    })
+    this.taskPanel.addEventListener('click', (e) => {
+      if (e.target.closest('[data-act="closetask"]')) this.closeTask()
+    })
+  }
+
+  openTask(id) { this._openTaskId = id; this._renderTaskPanel() }
+  closeTask() { this._openTaskId = null; this.taskPanel.style.display = 'none' }
+
+  _renderTaskPanel() {
+    const t = this._tasks.find((x) => x.id === this._openTaskId)
+    if (!t) { this.taskPanel.style.display = 'none'; return }
+    const agent = t.agentId ? this._agents.find((a) => a.id === t.agentId)?.name : null
+    const who = agent || t.doneBy || '—'
+    const pct = Math.round((t.progress || 0) * 100)
+    const lines = []
+    lines.push(`<div class="tp__meta">state: <b style="color:var(--ink)">${t.state}</b> · ${pct}%</div>`)
+    lines.push(`<div class="tp__meta">${t.state === 'done' ? 'completed by' : 'agent'}: ${esc(who)}</div>`)
+    if (t.topic) lines.push(`<div class="tp__meta">topic: ${esc(t.topic)}</div>`)
+    if (t.claim) lines.push(`<div class="tp__meta">claim: ${esc(t.claim)}</div>`)
+    if (t.stage > 1 || t.parent) lines.push(`<div class="tp__meta">stage ${t.stage} · handed off from a prior task</div>`)
+    if (t.finding) lines.push(`<div class="tp__block"><div class="tp__lbl">prior verdict</div>${esc(t.finding)}</div>`)
+    if (t.result) lines.push(`<div class="tp__block"><div class="tp__lbl">result</div>${esc(t.result)}</div>`)
+    if (Array.isArray(t.scratch) && t.scratch.length) {
+      lines.push(`<div class="tp__lbl">steps</div><ol class="tp__steps">${t.scratch.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>`)
+    }
+
+    this.taskPanel.innerHTML = `
+      <div class="tp__head">
+        <span class="tp__kind">${t.kind || 'task'}</span>
+        <button class="tp__x" data-act="closetask" title="close">✕</button>
+      </div>
+      <div class="tp__title">${esc(t.title)}</div>
+      ${lines.join('')}
+    `
+    this.taskPanel.style.display = 'block'
   }
 
   _meterHtml(id, label, pct) {
@@ -121,25 +171,31 @@ export class Hud {
       : 'online · local simulation'
   }
 
-  updateBoard(tasks) {
+  updateBoard(tasks, completed) {
     if (!tasks) return
+    this._tasks = tasks
     const by = { backlog: 0, assigned: 0, in_progress: 0, done: 0, failed: 0 }
     for (const t of tasks) by[t.state] = (by[t.state] || 0) + 1
     this.root.querySelector('#bd-backlog').textContent = by.backlog + by.assigned
     this.root.querySelector('#bd-progress').textContent = by.in_progress
-    this.root.querySelector('#bd-done').textContent = by.done
+    this.root.querySelector('#bd-done').textContent = completed ?? by.done
 
-    // Show the BACKLOG (queued, assignable) first, then in-progress with bars.
-    const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+    // Rows are clickable → task detail. Show backlog (queued), in-progress
+    // (with bars), then a few recent done so completed results are inspectable.
     const list = this.root.querySelector('#bd-list')
     const rows = []
-    for (const t of tasks.filter((t) => t.state === 'backlog').slice(0, 5)) {
-      rows.push(`<li><span class="bd-title">${esc(t.title)}</span><span class="bd-badge">queued</span></li>`)
+    for (const t of tasks.filter((t) => t.state === 'backlog').slice(0, 4)) {
+      rows.push(`<li class="bd-row" data-taskid="${t.id}"><span class="bd-title">${esc(t.title)}</span><span class="bd-badge">queued</span></li>`)
     }
-    for (const t of tasks.filter((t) => t.state === 'in_progress').slice(0, 4)) {
-      rows.push(`<li><span class="bd-title">${esc(t.title)}</span><span class="bd-track"><span class="bd-fill" style="width:${Math.round(t.progress * 100)}%"></span></span></li>`)
+    for (const t of tasks.filter((t) => t.state === 'in_progress').slice(0, 3)) {
+      rows.push(`<li class="bd-row" data-taskid="${t.id}"><span class="bd-title">${esc(t.title)}</span><span class="bd-track"><span class="bd-fill" style="width:${Math.round(t.progress * 100)}%"></span></span></li>`)
+    }
+    for (const t of tasks.filter((t) => t.state === 'done').slice(-3).reverse()) {
+      rows.push(`<li class="bd-row" data-taskid="${t.id}"><span class="bd-title">${esc(t.title)}</span><span class="bd-badge bd-done">done</span></li>`)
     }
     list.innerHTML = rows.join('') || '<li class="bd-empty">board empty</li>'
+
+    if (this._openTaskId) this._renderTaskPanel() // keep an open detail panel live
   }
 
   _setMeter(id, pct) {
@@ -153,6 +209,7 @@ export class Hud {
   }
 
   update({ agents, host, active }) {
+    this._agents = agents
     // Counts
     this.root.querySelector('#r-total').textContent = agents.length
     this.root.querySelector('#r-active').textContent = active

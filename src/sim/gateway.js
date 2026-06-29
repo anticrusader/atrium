@@ -64,6 +64,7 @@ export class MockGateway extends Emitter {
     this.autoAssign = true
     this._timer = null
     this._taskSeq = 0
+    this._completed = 0
     this._agents = []
     this._tasks = []
     this._host = { cpu: 30, mem: 70, disk: 24, net: 12 }
@@ -107,7 +108,7 @@ export class MockGateway extends Emitter {
 
   start() {
     if (this._timer) return
-    this.emit('snapshot', { agents: this._agents, tasks: this._tasks, host: this._host, version: this.version })
+    this.emit('snapshot', { agents: this._agents, tasks: this._tasks, host: this._host, version: this.version, completed: this._completed })
     this._timer = setInterval(() => this._tick(), this.tickMs)
   }
   stop() { if (this._timer) clearInterval(this._timer); this._timer = null }
@@ -183,7 +184,8 @@ export class MockGateway extends Emitter {
         else if (--a._beat <= 0) { a.status = 'thinking'; a._beat = 1 }
       } else if (a.status === 'messaging') {
         if (--a._beat > 0) continue
-        t.state = 'done'; t.agentId = null
+        t.state = 'done'; t.agentId = null; t.doneBy = a.name
+        this._completed += 1
         events.push({ who: a.name, verb: 'completed', what: t.title })
         a.taskId = null; a.task = 'idle'; a.status = 'idle'
         a.zone = pick(['lounge', 'cafe', 'playroom', 'courtyard'])
@@ -204,7 +206,7 @@ export class MockGateway extends Emitter {
     this._host.disk = clamp(Math.round(this._host.disk + (Math.random() * 2 - 1)), 10, 95)
     this._host.net = clamp(Math.round(8 + load * 55 + (Math.random() * 10 - 5)), 0, 99)
 
-    this.emit('tick', { agents: this._agents, tasks: this._tasks, host: this._host, active, events: events.slice(-6) })
+    this.emit('tick', { agents: this._agents, tasks: this._tasks, host: this._host, active, events: events.slice(-6), completed: this._completed })
   }
 }
 
