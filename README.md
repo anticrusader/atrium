@@ -1,15 +1,16 @@
-# Hermes Agora
+# Atrium
 
 > A living **3D office for your agents** — watch them walk the floor, pick up
 > tasks, think, message, and complete work in real time… and **orchestrate**
 > them: spawn agents, create tasks, assign, pause, and route work from the view.
 
-An unofficial, self-hostable take on the [hermesagora.com](https://www.hermesagora.com/)
-concept, extended from a *monitor* into a small **agent orchestrator**. Built
-with **Three.js + Vite** (dashboard) and a tiny **Node + WebSocket** backend
-(orchestrator).
+A self-hostable **agent visualizer + orchestrator**: agents move through a 3D
+office, do real work (live Wikipedia research, a two-agent fact-check pipeline),
+hand off to each other, and you watch and steer it all. Built with **Three.js +
+Vite** (dashboard) and a tiny **Node + WebSocket** backend (orchestrator).
 
-> Independent community project. Not affiliated with Hermes or Nous Research.
+> Originally inspired by the [hermesagora.com](https://www.hermesagora.com/)
+> concept; now its own project. Not affiliated with Hermes or Nous Research.
 
 New to agent orchestration? Read the guide: **[docs/ORCHESTRATION.md](docs/ORCHESTRATION.md)**.
 

@@ -5,10 +5,11 @@ this project so work can continue on any machine after a `git pull`.
 
 ## What this is
 
-**Hermes Agora** — an unofficial, self-hostable rebuild of
-[hermesagora.com](https://www.hermesagora.com/): a "living 3D office" that
-visualizes AI agents. It was built from scratch in this repo and then **extended
-from a pure monitor into a small agent orchestrator**.
+**Atrium** (formerly "Hermes Agora") — a self-hostable "living 3D office" that
+visualizes AND orchestrates AI agents. Originally inspired by
+[hermesagora.com](https://www.hermesagora.com/); built from scratch in this repo
+and **extended from a pure monitor into a small agent orchestrator**. The GitHub
+repo is `anticrusader/atrium` (the local folder may still be named `hermesagora`).
 
 **Why it exists:** the owner is using it to **learn agent orchestration
 hands-on**. Prioritize clarity and teachability over cleverness. The teaching

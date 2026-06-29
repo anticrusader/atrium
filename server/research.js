@@ -10,7 +10,7 @@
 // and advance one per tick (each tick = one real network/model call), reusing
 // the same async, non-blocking WORKING loop as every other task.
 
-const UA = { 'User-Agent': 'HermesAgora/0.1 (educational orchestration demo)' }
+const UA = { 'User-Agent': 'Atrium/0.1 (educational orchestration demo)' }
 
 // Turn a natural-language question into a good search term, so a typed topic
 // like "what is loop engineering?" searches "loop engineering" (and lands on

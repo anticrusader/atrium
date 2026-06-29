@@ -7,7 +7,7 @@ metadata:
   originSessionId: d038332f-35c5-4dfe-b433-7670731d815a
 ---
 
-**Hermes Agora** (dir: `OneDrive/Desktop/Cursor Repositories/hermesagora`) is an unofficial, self-hostable rebuild of hermesagora.com — a "living 3D office" that visualizes AI agents. The user extended it from a pure monitor into a small **agent orchestrator** specifically to **learn agent orchestration hands-on**.
+**Atrium** (renamed 2026-06-29 from "Hermes Agora"; GitHub repo `anticrusader/atrium`; local dir still `OneDrive/Desktop/Cursor Repositories/hermesagora`) is a self-hostable "living 3D office" that visualizes AND orchestrates AI agents, originally inspired by hermesagora.com. The user extended it from a pure monitor into a small **agent orchestrator** specifically to **learn agent orchestration hands-on**.
 
 Stack: Three.js + Vite dashboard (`src/`), Node + `ws` orchestrator backend (`server/`). Shared wire contract in `server/protocol.js` imported by both sides.
 

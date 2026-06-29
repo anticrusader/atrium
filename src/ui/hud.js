@@ -43,7 +43,7 @@ export class Hud {
     // --- Brand / status (top-left) ---
     this.brand = el('div', 'hud__panel brand')
     this.brand.innerHTML = `
-      <div class="brand__mark">HERMES <span>//</span> AGORA</div>
+      <div class="brand__mark">ATRIUM</div>
       <div class="brand__sub"><span class="dot"></span><span id="b-status">online · gateway running</span></div>
       <div class="brand__ver" id="b-ver">${this.version}</div>
     `
@@ -200,19 +200,21 @@ export class Hud {
     this._tasks = tasks
     const by = { backlog: 0, assigned: 0, in_progress: 0, done: 0, failed: 0 }
     for (const t of tasks) by[t.state] = (by[t.state] || 0) + 1
-    this.root.querySelector('#bd-backlog').textContent = by.backlog + by.assigned
-    this.root.querySelector('#bd-progress').textContent = by.in_progress
+    // Counts now match the list exactly: backlog = queued only; an assigned task
+    // (an agent walking to it) counts as in-progress, not backlog.
+    this.root.querySelector('#bd-backlog').textContent = by.backlog
+    this.root.querySelector('#bd-progress').textContent = by.in_progress + by.assigned
     this.root.querySelector('#bd-done').textContent = completed ?? by.done
 
-    // Rows are clickable → task detail. Show backlog (queued), in-progress
-    // (with bars), then a few recent done so completed results are inspectable.
+    // Rows are clickable → task detail. Show the FULL backlog (the list scrolls),
+    // then active tasks with bars, then a few recent done.
     const list = this.root.querySelector('#bd-list')
     const rows = []
-    for (const t of tasks.filter((t) => t.state === 'backlog').slice(0, 4)) {
+    for (const t of tasks.filter((t) => t.state === 'backlog')) {
       rows.push(`<li class="bd-row" data-taskid="${t.id}"><span class="bd-title">${esc(t.title)}</span><span class="bd-badge">queued</span></li>`)
     }
-    for (const t of tasks.filter((t) => t.state === 'in_progress').slice(0, 3)) {
-      rows.push(`<li class="bd-row" data-taskid="${t.id}"><span class="bd-title">${esc(t.title)}</span><span class="bd-track"><span class="bd-fill" style="width:${Math.round(t.progress * 100)}%"></span></span></li>`)
+    for (const t of tasks.filter((t) => t.state === 'assigned' || t.state === 'in_progress').slice(0, 5)) {
+      rows.push(`<li class="bd-row" data-taskid="${t.id}"><span class="bd-title">${esc(t.title)}</span><span class="bd-track"><span class="bd-fill" style="width:${Math.round((t.progress || 0) * 100)}%"></span></span></li>`)
     }
     for (const t of tasks.filter((t) => t.state === 'done').slice(-3).reverse()) {
       rows.push(`<li class="bd-row" data-taskid="${t.id}"><span class="bd-title">${esc(t.title)}</span><span class="bd-badge bd-done">done</span></li>`)

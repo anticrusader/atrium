@@ -1,8 +1,8 @@
 {
-  "name": "hermes-agora",
+  "name": "atrium",
   "version": "0.1.0",
   "private": true,
-  "description": "Hermes Agora — a living 3D office for your Hermes agents (unofficial community build).",
+  "description": "Atrium — a living 3D office that visualizes and orchestrates your AI agents.",
   "type": "module",
   "scripts": {
     "dev": "vite",

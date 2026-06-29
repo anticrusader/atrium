@@ -90,7 +90,7 @@ function broadcast(frame) {
 
 wss.on('listening', () => {
   const i = metrics.info()
-  console.log(`\n  HERMES // AGORA  orchestrator`)
+  console.log(`\n  ATRIUM  orchestrator`)
   console.log(`  ws://${HOST}:${PORT}   (${i.cores} cores · ${i.platform} · ${i.totalMemGb}GB)`)
   console.log(`  open the dashboard with:  ?feed=ws://${HOST}:${PORT}\n`)
 })
