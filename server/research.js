@@ -29,6 +29,29 @@ async function wikiSummary(title) {
   return data?.extract ?? null
 }
 
+// A SECOND, independent retrieval path for verification — DuckDuckGo's Instant
+// Answer API, with a Wikipedia fallback. Retrieves by the SUBJECT (topic), not
+// the full claim sentence (which returns garbage matches). DDG is a separate
+// endpoint/aggregator from stage 1's Wikipedia REST read.
+async function secondSource(claim, topic) {
+  const subject = topic || claim
+  try {
+    const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(subject)}&format=json&no_html=1&skip_disambig=1`
+    const res = await fetch(url, { headers: UA })
+    if (res.ok) {
+      const j = await res.json()
+      if (j.AbstractText) return { text: j.AbstractText.slice(0, 1200), src: `DuckDuckGo${j.AbstractSource ? '/' + j.AbstractSource : ''}` }
+    }
+  } catch { /* fall through to Wikipedia */ }
+  // Fallback: a Wikipedia read of the subject (relevant even if same family).
+  const title = await wikiSearch(subject)
+  if (title) {
+    const ex = await wikiSummary(title)
+    if (ex) return { text: ex.slice(0, 1200), src: `Wikipedia: ${title}` }
+  }
+  return null
+}
+
 /**
  * One real research step. Mutates `task` to track phase and store the result.
  * @param {object} ctx
@@ -75,5 +98,76 @@ export async function researchStep({ task, chat, limiter }) {
   } catch (err) {
     task.phase = 'done'
     return { delta: 1, note: `research error: ${err.message}` }
+  }
+}
+
+// ── Fact-check, STAGE 1 ──────────────────────────────────────────────────────
+// Agent A: research a claim against a PRIMARY source (Wikipedia) and reach a
+// preliminary verdict. The verdict (task.result) is what gets HANDED OFF to a
+// second agent for independent verification (stage 2 below).
+export async function factCheckStep({ task, chat, limiter }) {
+  try {
+    if (!task.phase) {
+      const title = await wikiSearch(task.topic)
+      if (!title) { task.phase = 'done'; return { delta: 1, note: `no source found for "${task.topic}"` } }
+      task._title = title
+      task.phase = 'read'
+      return { delta: 0.3, note: `looking into the claim — found source "${title}"` }
+    }
+    if (task.phase === 'read') {
+      const extract = await wikiSummary(task._title)
+      task._extract = (extract || '').slice(0, 1500)
+      task.phase = 'assess'
+      return { delta: 0.3, note: `read "${task._title}" — ${task._extract.length} chars` }
+    }
+    if (task.phase === 'assess') {
+      if (!limiter.take()) return { delta: 0, note: '⏳ waiting for a model slot' }
+      const r = await chat([
+        { role: 'system', content: 'You are a fact-checker. Using ONLY the source text, judge the claim. Start your reply with exactly one word — SUPPORTED, CONTRADICTED, or UNCLEAR — then a brief reason. Be concise.' },
+        { role: 'user', content: `Claim: "${task.claim}"\nSource (${task._title}):\n"""${task._extract || '(none)'}"""\n\nVerdict:` },
+      ], 120)
+      if (!r.ok) return { delta: 0, note: `⏳ model busy (${r.status || 'error'})` }
+      const verdict = (r.text || '').replace(/\s+/g, ' ').trim()
+      task.result = verdict
+      task.phase = 'done'
+      return { delta: 1, note: `⚖️ ${verdict || '(no verdict)'}` }
+    }
+    return { delta: 1, note: 'done' }
+  } catch (err) {
+    task.phase = 'done'
+    return { delta: 1, note: `fact-check error: ${err.message}` }
+  }
+}
+
+// ── Fact-check, STAGE 2 (the handoff) ────────────────────────────────────────
+// Agent B: receives A's claim + preliminary verdict, pulls an INDEPENDENT second
+// source, and confirms or disputes A's conclusion. This is real multi-agent
+// collaboration on real data — B never saw A's source, only A's verdict.
+export async function verifyStep({ task, chat, limiter }) {
+  try {
+    if (!task.phase) {
+      const second = await secondSource(task.claim)
+      task._src2 = second?.text || ''
+      task._src2name = second?.src || 'no second source'
+      task.phase = 'judge'
+      return { delta: 0.4, note: `pulled an independent second source (${task._src2name})` }
+    }
+    if (task.phase === 'judge') {
+      if (!limiter.take()) return { delta: 0, note: '⏳ waiting for a model slot' }
+      const r = await chat([
+        { role: 'system', content: 'You independently verify a colleague\'s fact-check. Compare their verdict against the SECOND source provided. Start your reply with exactly one word — CONFIRM or DISPUTE — then a brief reason. Use only the second source.' },
+        { role: 'user', content: `Claim: "${task.claim}"\nColleague's verdict: ${task.finding || '(none)'}\nSecond source (${task._src2name}):\n"""${task._src2 || '(no text retrieved)'}"""\n\nYour judgment:` },
+      ], 120)
+      if (!r.ok) return { delta: 0, note: `⏳ model busy (${r.status || 'error'})` }
+      const text = (r.text || '').replace(/\s+/g, ' ').trim()
+      const emoji = /\bDISPUTE/i.test(text) ? '❌' : /\bCONFIRM/i.test(text) ? '✅' : '⚖️'
+      task.result = text
+      task.phase = 'done'
+      return { delta: 1, note: `${emoji} ${text || '(no judgment)'}` }
+    }
+    return { delta: 1, note: 'done' }
+  } catch (err) {
+    task.phase = 'done'
+    return { delta: 1, note: `verify error: ${err.message}` }
   }
 }

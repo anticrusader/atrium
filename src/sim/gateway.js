@@ -87,11 +87,15 @@ export class MockGateway extends Emitter {
     // here is just labeled like one and narrated. Real research needs the
     // orchestrator backend (?feed=ws://...).
     const isResearch = opts.kind === 'research'
+    const isFactcheck = opts.kind === 'factcheck'
     const topic = isResearch ? pick(['tardigrades', 'black holes', 'the Silk Road', 'CRISPR', 'photosynthesis']) : null
+    const claim = isFactcheck ? pick(['Honey never spoils', 'Sharks are mammals', 'Bananas grow on trees']) : null
+    let title = opts.title
+    if (!title) title = isResearch ? `research: ${topic}` : isFactcheck ? `fact-check: ${claim}` : pick(TASK_TITLES)
     const t = {
       id: `t${this._taskSeq.toString().padStart(3, '0')}`,
-      title: opts.title || (isResearch ? `research: ${topic}` : pick(TASK_TITLES)),
-      zone: isResearch ? 'library' : (ZONES.find((z) => z.key === opts.zone) ? opts.zone : pick(TASK_ZONE)),
+      title,
+      zone: isResearch ? 'library' : isFactcheck ? 'jira' : (ZONES.find((z) => z.key === opts.zone) ? opts.zone : pick(TASK_ZONE)),
       state: 'backlog', agentId: null, progress: 0,
     }
     this._tasks.push(t)

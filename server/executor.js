@@ -16,7 +16,7 @@
 // Task kinds: a normal task is "narrated" by the model (simulated work); a
 // `research` task does GENUINELY REAL work via researchStep (Wikipedia + model).
 
-import { researchStep } from './research.js'
+import { researchStep, factCheckStep, verifyStep } from './research.js'
 
 const now = () => Date.now()
 
@@ -133,9 +133,12 @@ export function makeLLMExecutor(cfg) {
     return { delta: done ? 1 : 0.26, note: text || 'thinking…' }
   }
 
-  // Dispatch by task kind: research tasks do REAL tool work; others narrate.
+  // Dispatch by task kind: research/factcheck/verify do REAL tool work; the
+  // rest are narrated by the model (simulated).
   async function step(agent, task) {
     if (task.kind === 'research') return researchStep({ task, chat, limiter })
+    if (task.kind === 'factcheck') return factCheckStep({ task, chat, limiter })
+    if (task.kind === 'verify') return verifyStep({ task, chat, limiter })
     return narrationStep(agent, task)
   }
 

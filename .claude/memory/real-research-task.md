@@ -1,16 +1,18 @@
 ---
 name: real-research-task
-description: "Hermes Agora has one genuinely-real task kind (Wikipedia research), the template for real tool use"
+description: Hermes Agora real task kinds — Wikipedia research + a 2-stage multi-agent fact-check pipeline
 metadata: 
   node_type: memory
   type: project
   originSessionId: d038332f-35c5-4dfe-b433-7670731d815a
 ---
 
-[[hermes-agora-project]] now has a genuinely REAL task kind (not simulated narration): `kind:'research'`. Implemented in `server/research.js`, routed from `server/executor.js` `step()`. Flow: (1) SEARCH live Wikipedia API for `task.topic`, (2) READ the real article extract, (3) SUMMARIZE that real content with the model. Completion = a grounded summary actually produced (stored on `task.result`); the 📚 summary shows in the activity feed.
+[[hermes-agora-project]] has REAL task kinds (not simulated narration), in `server/research.js`, routed from `server/executor.js` `step()`:
 
-Created via the **`+ research`** toolbar button (`create_task {kind:'research'}`), seed (2 at boot), and trickle (~30%). Happens in the library zone. `Orchestrator._wireTasks()` strips `_`-prefixed fields (e.g. `_extract`) from the wire. Only the summarize phase spends a rate-limiter token (Wikipedia calls are free).
+**`research`** — SEARCH live Wikipedia → READ extract → SUMMARIZE with the model. Completion = a grounded 📚 summary (task.result). Library zone. `+ research` button / seed (2) / trickle (~25%).
 
-Bug fixed along the way: agent-runtime WORKING used to discard the final step's note behind a generic "finishing" label, so the 📚 summary never reached the feed — now it surfaces `note || task.title`.
+**`factcheck` + `verify` (real 2-stage multi-agent pipeline)** — Agent A researches a CLAIM vs Wikipedia → verdict `⚖️ SUPPORTED/CONTRADICTED/UNCLEAR` (jira floor). On completion, `_maybeHandoff` ALWAYS creates a stage-2 `verify` task carrying claim+verdict, with `_exclude = doer` so a DIFFERENT agent takes it. Agent B pulls an INDEPENDENT second source (DuckDuckGo Instant Answer, Wikipedia fallback — retrieved by SUBJECT/topic, NOT the full claim sentence which returns garbage) → `✅ CONFIRM` / `❌ DISPUTE` (conference hall). `+ fact-check` button / seed (1) / trickle (~15%). Claims in `CLAIMS` (orchestrator).
 
-Verified live on NVIDIA: "searched Wikipedia for 'black holes' → found 'Black hole'" → "read … 608 chars of real content" → "📚 A black hole is an extremely compact astronomical body…". This is the TEMPLATE for all real work: swap Wikipedia for any tool (web search, file read, API, test runner) and decide completion from real results. Offline MockGateway can't fetch — real research needs the backend (`?feed=ws://...`). See [[next-step-real-executor]].
+Key orchestrator changes: `_dispatch` ranks backlog (stage-2 verify > real research/factcheck > sim) so real work is promptly visible under the shared rate limit, and honors `_exclude`. Per-tick event window widened to `events.slice(-16)` (was -6) so verdicts aren't dropped when many agents emit at once. `_wireTasks()` strips `_`-prefixed fields. Also fixed: agent-runtime WORKING now surfaces the final step's note (so 📚/⚖️/✅ aren't hidden behind a generic 'finishing' label).
+
+Verified live on NVIDIA: Zephyr Dune ⚖️ CONTRADICTED → handoff → Nico Dune ✅ CONFIRM (different agents). Caveat: stage 1 reads only the short Wikipedia summary extract, so a TRUE claim can read CONTRADICTED if the summary omits it — honest ("source doesn't support this"), not a bug. This is the TEMPLATE for real tool use + multi-agent collaboration. Offline MockGateway only labels these (no network). See [[next-step-real-executor]], [[free-hosted-models]].

@@ -168,6 +168,25 @@ is the template for any real tool: swap Wikipedia for web search, a file read, a
 API call, or a test runner. (Needs the backend — `?feed=ws://…`; the offline sim
 can't make network calls.)
 
+### Real fact-check pipeline (multi-agent, on real data)
+
+Click **`+ fact-check`** and watch a real two-stage, two-agent collaboration:
+
+1. **Agent A** researches a claim (e.g. *"Sharks are mammals"*) against Wikipedia
+   and posts a verdict — *⚖️ CONTRADICTED …*.
+2. A **handoff** sends that verdict to a **different agent**.
+3. **Agent B** independently pulls a **second source** (DuckDuckGo, Wikipedia
+   fallback) and *✅ CONFIRM*s or *❌ DISPUTE*s Agent A's conclusion.
+
+This is genuine multi-agent verification: B never saw A's source, only A's
+claim and verdict, and reaches its own judgment from independent data. Code:
+[`server/research.js`](server/research.js) (`factCheckStep` + `verifyStep`), with
+the deterministic handoff in [`server/orchestrator.js`](server/orchestrator.js).
+
+> Caveat: stage 1 reads only Wikipedia's short summary extract, so a *true* claim
+> can read as CONTRADICTED when the summary simply doesn't mention it — that's the
+> model honestly reporting "the source doesn't support this," not a failure.
+
 ## Configuration
 
 | What | Where |

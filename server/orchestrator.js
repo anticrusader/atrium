@@ -31,6 +31,21 @@ const RESEARCH_TOPICS = [
   'general relativity', 'the history of coffee', 'mycorrhizal networks', 'the transistor',
 ]
 
+// Real claims to fact-check (a deliberate mix of true and false). `topic` is the
+// Wikipedia subject the stage-1 agent looks up.
+const CLAIMS = [
+  { claim: 'The Great Wall of China is visible from space with the naked eye', topic: 'Great Wall of China' },
+  { claim: 'Honey never spoils', topic: 'Honey' },
+  { claim: 'Goldfish have a three-second memory', topic: 'Goldfish' },
+  { claim: 'Lightning never strikes the same place twice', topic: 'Lightning' },
+  { claim: 'Bananas grow on trees', topic: 'Banana' },
+  { claim: 'Sharks are mammals', topic: 'Shark' },
+  { claim: 'The Eiffel Tower can grow taller in summer', topic: 'Eiffel Tower' },
+  { claim: 'Venus is the hottest planet in the Solar System', topic: 'Venus' },
+  { claim: 'Humans use only ten percent of their brains', topic: 'Human brain' },
+  { claim: 'The Sahara is the largest desert on Earth', topic: 'Sahara' },
+]
+
 const r = (n) => Math.floor(Math.random() * n)
 const pick = (a) => a[r(a.length)]
 
@@ -53,9 +68,10 @@ export class Orchestrator {
     // Seed an initial fleet so the office isn't empty on first connect.
     const n = opts.fleet ?? 18
     for (let i = 0; i < n; i++) this.spawn(1, { silent: true })
-    // Seed a backlog — a mix of simulated work and a couple of REAL research tasks.
-    for (let i = 0; i < 7; i++) this.createTask({}, { silent: true })
+    // Seed a backlog — a mix of simulated work and a few REAL tasks.
+    for (let i = 0; i < 6; i++) this.createTask({}, { silent: true })
     for (let i = 0; i < 2; i++) this.createTask({ kind: 'research' }, { silent: true })
+    this.createTask({ kind: 'factcheck' }, { silent: true })
   }
 
   // ── Command handlers (the control plane) ─────────────────────────────────
@@ -83,24 +99,48 @@ export class Orchestrator {
     return true
   }
 
-  createTask({ title, zone, stage, parent, kind, topic } = {}, opts = {}) {
+  createTask({ title, zone, stage, parent, kind, topic, claim, finding } = {}, opts = {}) {
     _taskSeq += 1
-    // A `research` task is REAL work: it looks up a topic on Wikipedia and the
-    // model summarizes the fetched content (see server/research.js). It happens
-    // in the library.
-    const isResearch = kind === 'research'
-    const tp = topic || (isResearch ? pick(RESEARCH_TOPICS) : null)
+    // REAL task kinds (see server/research.js):
+    //   research  — look up a topic on Wikipedia, summarize it (library)
+    //   factcheck — judge a CLAIM against Wikipedia (stage 1, jira floor)
+    //   verify    — re-check a claim against an independent 2nd source (stage 2,
+    //               conference hall) — created by the fact-check handoff
+    let k = kind || 'sim'
+    let tp = topic ?? null
+    let cl = claim ?? null
+    let zn, ti
+
+    if (k === 'research') {
+      tp = tp || pick(RESEARCH_TOPICS)
+      ti = title || `research: ${tp}`
+      zn = 'library'
+    } else if (k === 'factcheck') {
+      const c = cl ? { claim: cl, topic: tp } : pick(CLAIMS)
+      cl = c.claim; tp = c.topic
+      ti = title || `fact-check: ${cl}`
+      zn = 'jira'
+    } else if (k === 'verify') {
+      ti = title || `verify: ${cl ?? ''}`
+      zn = 'conference'
+    } else {
+      ti = title || pick(TASK_TITLES)
+      zn = (zone && ZONE_KEYS.includes(zone)) ? zone : pick(TASK_ZONE)
+    }
+
     const task = {
       id: `t${_taskSeq.toString().padStart(3, '0')}`,
-      title: title || (isResearch ? `research: ${tp}` : pick(TASK_TITLES)),
-      zone: isResearch ? 'library' : (zone && ZONE_KEYS.includes(zone)) ? zone : pick(TASK_ZONE),
+      title: ti,
+      zone: zn,
       state: TASK_STATE.BACKLOG,
       agentId: null,
       progress: 0,
       stage: stage ?? 1,      // 1 = original work, 2 = a follow-up from a handoff
       parent: parent ?? null, // the task this one was handed off from
-      kind: isResearch ? 'research' : 'sim',
-      topic: tp,              // the real subject for a research task
+      kind: k,
+      topic: tp,              // real subject (research / factcheck)
+      claim: cl,              // the claim under test (factcheck / verify)
+      finding: finding ?? null, // stage-1 verdict carried into a verify task
     }
     this.tasks.set(task.id, task)
     if (!opts.silent) this._log({ who: 'board', verb: 'new task', what: task.title })
@@ -111,10 +151,23 @@ export class Orchestrator {
   // becomes the INPUT to a new follow-up task that a DIFFERENT idle agent will
   // pick up. That is a two-stage pipeline — the essence of multi-agent
   // collaboration. We cap it at stage 2 so chains don't grow forever.
-  _maybeHandoff(taskId, events) {
+  _maybeHandoff(taskId, events, doer) {
     const t = this.tasks.get(taskId)
     if (!t || (t.stage ?? 1) >= 2) return
-    if (Math.random() > 0.55) return // ~45% of finished work gets handed off
+
+    // Fact-check ALWAYS hands off to an independent verifier (a DIFFERENT agent),
+    // carrying the claim + stage-1 verdict. This is the real 2-stage pipeline.
+    if (t.kind === 'factcheck') {
+      const v = this.createTask(
+        { kind: 'verify', claim: t.claim, topic: t.topic, finding: t.result, parent: t.id, stage: 2 },
+        { silent: true }
+      )
+      v._exclude = doer // don't let the stage-1 agent verify its own work
+      events.push({ who: 'handoff', verb: 'handed off', what: `fact-check → independent verify of "${t.claim}"` })
+      return
+    }
+
+    if (Math.random() > 0.55) return // ~45% of other finished work gets handed off
     const followTitle = pick([
       `review: ${t.title}`,
       `write up: ${t.title}`,
@@ -187,18 +240,25 @@ export class Orchestrator {
     const busy = [...this.agents.values()].filter((a) => a.taskId).length
     let slots = this.maxConcurrent - busy
     if (slots <= 0) return
-    const idle = [...this.agents.values()].filter((a) => a.status === STATUS.IDLE)
-    if (!idle.length) return
-    // Prefer stage-2 (handoff) tasks so pipelines flow to completion first.
+    const idlePool = [...this.agents.values()].filter((a) => a.status === STATUS.IDLE)
+    if (!idlePool.length) return
+    // Priority: stage-2 verify first (finish pipelines), then real work
+    // (research/factcheck) so it's promptly visible, then simulated tasks.
+    const rank = (t) =>
+      (t.stage ?? 1) * 10 +
+      (t.kind === 'verify' ? 5 : t.kind === 'factcheck' || t.kind === 'research' ? 3 : 0)
     const backlog = [...this.tasks.values()]
       .filter((t) => t.state === TASK_STATE.BACKLOG)
-      .sort((a, b) => (b.stage ?? 1) - (a.stage ?? 1))
-    let i = 0
+      .sort((a, b) => rank(b) - rank(a))
     for (const task of backlog) {
-      if (i >= idle.length || slots <= 0) break
-      idle[i].assign(task)
-      this._log({ who: idle[i].name, verb: 'picked up', what: task.title })
-      i++; slots--
+      if (slots <= 0 || !idlePool.length) break
+      // Honor _exclude (e.g. a verify task must not go to the stage-1 agent).
+      const idx = idlePool.findIndex((a) => !task._exclude || a.name !== task._exclude)
+      if (idx === -1) continue // only the excluded agent is free — wait a tick
+      const a = idlePool.splice(idx, 1)[0]
+      a.assign(task)
+      this._log({ who: a.name, verb: 'picked up', what: task.title })
+      slots--
     }
   }
 
@@ -213,8 +273,9 @@ export class Orchestrator {
       const line = a.tick(this.tasks)
       if (line) {
         events.push(line)
-        // When a task completes, maybe hand its result to a teammate.
-        if (line.verb === 'completed' && line.taskId) this._maybeHandoff(line.taskId, events)
+        // When a task completes, maybe hand its result to a teammate. Pass the
+        // doer's name so a verify task goes to a DIFFERENT agent.
+        if (line.verb === 'completed' && line.taskId) this._maybeHandoff(line.taskId, events, line.who)
       }
     }
     events.forEach((e) => this._log(e))
@@ -222,8 +283,10 @@ export class Orchestrator {
     // keep a steady trickle of new work so the demo never stalls
     const backlogCount = [...this.tasks.values()].filter((t) => t.state === TASK_STATE.BACKLOG).length
     if (backlogCount < 3 && Math.random() < 0.5) {
-      // ~30% of fresh work is a real research task.
-      this.createTask(Math.random() < 0.3 ? { kind: 'research' } : {}, { silent: true })
+      // Mix in real work: ~25% research, ~15% fact-check, rest simulated.
+      const roll = Math.random()
+      const kind = roll < 0.25 ? 'research' : roll < 0.4 ? 'factcheck' : undefined
+      this.createTask(kind ? { kind } : {}, { silent: true })
     }
 
     // 4. PUBLISH payload
@@ -235,7 +298,10 @@ export class Orchestrator {
       tasks: this._wireTasks(),
       host,
       active,
-      events: events.slice(-6),
+      // Keep a generous window: with up to maxConcurrent agents emitting a line
+      // per tick (plus board/handoff lines), a small slice would silently drop
+      // the earliest agents' events (e.g. a fact-check verdict).
+      events: events.slice(-16),
     }
   }
 

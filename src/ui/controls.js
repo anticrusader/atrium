@@ -40,6 +40,7 @@ export class Controls {
       <button data-act="spawn" title="Create a new agent">+ agent</button>
       <button data-act="task" title="Add a simulated task to the backlog">+ task</button>
       <button data-act="research" title="Add a REAL research task (live Wikipedia lookup + summary)">+ research</button>
+      <button data-act="factcheck" title="Add a REAL fact-check (research a claim, then a 2nd agent independently verifies it)">+ fact-check</button>
       <button data-act="auto" title="Toggle the auto-dispatcher">auto: <b>on</b></button>
       <button data-act="reset" class="ghost" title="Clear the board">reset</button>
     `
@@ -49,6 +50,7 @@ export class Controls {
       if (act === 'spawn') this.send(COMMAND.SPAWN, { count: 1 })
       else if (act === 'task') this.send(COMMAND.CREATE_TASK, {})
       else if (act === 'research') this.send(COMMAND.CREATE_TASK, { kind: 'research' })
+      else if (act === 'factcheck') this.send(COMMAND.CREATE_TASK, { kind: 'factcheck' })
       else if (act === 'reset') this.send(COMMAND.RESET, {})
       else if (act === 'auto') {
         this._auto = !this._auto

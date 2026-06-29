@@ -149,9 +149,37 @@ spends a rate-limiter token (search/read are free Wikipedia calls).
 - This is the template for ALL real work: swap Wikipedia for any tool (web
   search, file read, API, test runner) and decide completion from real results.
 
+## Real fact-check pipeline (multi-agent, 2 stages) — DONE
+
+A real 2-stage collaboration on real data (`server/research.js`
+`factCheckStep` + `verifyStep`):
+- **Stage 1 (`kind:'factcheck'`)** — Agent A researches a CLAIM against Wikipedia
+  and gives a verdict (SUPPORTED/CONTRADICTED/UNCLEAR), shown as `⚖️ …`. Happens
+  on the jira floor.
+- **Handoff** — on completion, `_maybeHandoff` ALWAYS creates a `kind:'verify'`
+  stage-2 task carrying the claim + stage-1 verdict, and sets `_exclude = doer`
+  so a DIFFERENT agent must take it.
+- **Stage 2 (`kind:'verify'`)** — Agent B pulls an INDEPENDENT second source
+  (DuckDuckGo Instant Answer, Wikipedia fallback — retrieved by SUBJECT/topic,
+  not the full claim) and CONFIRMs/DISPUTEs A's verdict, shown as `✅`/`❌`.
+  Happens in the conference hall.
+
+Created via the **`+ fact-check`** toolbar button, seed (1), and trickle (~15%).
+Claims live in `CLAIMS` (orchestrator). `_dispatch` now ranks backlog: stage-2
+verify > real (research/factcheck) > simulated, so real work is promptly visible
+and doesn't starve under the shared rate limit. `_dispatch` also honors
+`_exclude` (skips the stage-1 agent). The per-tick event window was widened
+(`events.slice(-16)`) so verdicts aren't dropped when many agents emit at once.
+
+Verified live on NVIDIA: e.g. Zephyr Dune ⚖️ CONTRADICTED → handoff → Nico Dune
+✅ CONFIRM (different agents). NOTE: stage 1 reads only the short Wikipedia
+summary extract, so a true claim can read as CONTRADICTED if the summary omits
+it — honest behavior ("the source doesn't support this"), not a bug.
+
 ## Possible NEXT STEPS (not done)
 - More real task kinds (web search via Tavily/Brave, run a shell command, etc.).
-- Priority / skill-based scheduling in `Orchestrator._dispatch()`.
+- Use fuller article text (not just the summary) for deeper fact-checks.
+- Skill-based scheduling in `Orchestrator._dispatch()`.
 - Surface the *currently active* model (post-rotation) in the HUD; executor
   exposes `current()`.
 - Graceful degradation: when fully rate-limited, optionally let agents make slow
