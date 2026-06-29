@@ -3,3 +3,8 @@ dist/
 .vite/
 *.log
 .DS_Store
+
+# Secrets — never commit. .env holds API keys; .env.example is the template.
+.env
+.env.*
+!.env.example
