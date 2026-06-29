@@ -39,6 +39,9 @@ export class Controls {
     this._selectedId = null // expanded/selected agent id
     this._pickCb = null     // tell the 3D world to highlight an agent
     this._auto = true
+    this._rowEls = new Map() // id -> <li>, so we UPDATE rows in place (never
+                             // rebuild) — otherwise the per-tick refresh would
+                             // destroy an open "send to zone" dropdown.
     this._build()
   }
 
@@ -140,29 +143,56 @@ export class Controls {
     row?.scrollIntoView({ block: 'nearest' })
   }
 
+  // Incremental render: create rows once, then UPDATE them in place each tick.
+  // This keeps interactive elements (the dropdown) alive across refreshes.
   _render() {
     this.dir.querySelector('#dir-count').textContent = `· ${this._agents.length}`
-    const scroll = this.list.scrollTop
-    this.list.innerHTML = this._agents.map((a) => this._rowHtml(a)).join('')
-    this.list.scrollTop = scroll
+    const seen = new Set()
+    for (const a of this._agents) {
+      seen.add(a.id)
+      let li = this._rowEls.get(a.id)
+      if (!li) { li = this._createRow(a); this.list.appendChild(li); this._rowEls.set(a.id, li) }
+      this._updateRow(li, a)
+    }
+    for (const [id, li] of this._rowEls) {
+      if (!seen.has(id)) { li.remove(); this._rowEls.delete(id) }
+    }
   }
 
-  _rowHtml(a) {
+  _createRow(a) {
+    const li = document.createElement('li')
+    li.className = 'dir__item'
+    li.dataset.id = a.id
+    li.innerHTML = `<div class="dir__row">
+        <span class="dir__dot"></span>
+        <span class="dir__name"></span>
+        <span class="dir__st"></span>
+      </div>`
+    return li
+  }
+
+  _updateRow(li, a) {
     const sel = a.id === this._selectedId
     const color = STATUS_COLOR[a.status] || STATUS_COLOR.idle
-    const head = `
-      <div class="dir__row">
-        <span class="dir__dot" style="background:${color};box-shadow:0 0 6px ${color}"></span>
-        <span class="dir__name">${a.name}</span>
-        <span class="dir__st" style="color:${color}">${a.status}</span>
-      </div>`
-    if (!sel) return `<li data-id="${a.id}" class="dir__item">${head}</li>`
+    li.classList.toggle('sel', sel)
+    const dot = li.querySelector('.dir__dot')
+    dot.style.background = color
+    dot.style.boxShadow = `0 0 6px ${color}`
+    li.querySelector('.dir__name').textContent = a.name
+    const st = li.querySelector('.dir__st')
+    st.textContent = a.status
+    st.style.color = color
 
+    let det = li.querySelector('.dir__detail')
+    if (sel && !det) li.insertAdjacentHTML('beforeend', this._detailHtml(a))
+    else if (!sel && det) det.remove()
+    else if (sel && det) this._updateDetail(det, a) // update text, leave controls intact
+  }
+
+  _detailHtml(a) {
     const paused = a.status === 'paused'
     const zones = ZONES.map((z) => `<option value="${z.key}">${z.label}</option>`).join('')
-    return `<li data-id="${a.id}" class="dir__item sel">
-      ${head}
-      <div class="dir__detail">
+    return `<div class="dir__detail">
         <div class="dir__meta">${a.model} · ${a.platform}</div>
         <div class="dir__meta">${a.status} — ${a.task || 'idle'}</div>
         <div class="dir__meta">uptime ${fmtUptime(a.uptime)}</div>
@@ -173,7 +203,19 @@ export class Controls {
           <button data-act="kill" class="danger">✕ remove</button>
         </div>
         <select data-act="move" class="dir__move"><option value="">send to zone…</option>${zones}</select>
-      </div>
-    </li>`
+      </div>`
+  }
+
+  _updateDetail(det, a) {
+    const m = det.querySelectorAll('.dir__meta')
+    m[0].textContent = `${a.model} · ${a.platform}`
+    m[1].textContent = `${a.status} — ${a.task || 'idle'}`
+    m[2].textContent = `uptime ${fmtUptime(a.uptime)}`
+    const pr = det.querySelector('button[data-act="pause"], button[data-act="resume"]')
+    if (pr) {
+      const paused = a.status === 'paused'
+      pr.dataset.act = paused ? 'resume' : 'pause'
+      pr.textContent = paused ? '▶ resume' : '⏸ pause'
+    }
   }
 }

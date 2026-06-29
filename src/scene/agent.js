@@ -78,14 +78,26 @@ export class AgentAvatar {
 
     // Selection ring (hidden until this agent is clicked).
     this.ring = new THREE.Mesh(
-      new THREE.RingGeometry(0.55, 0.72, 28),
-      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, side: THREE.DoubleSide })
+      new THREE.RingGeometry(0.6, 0.82, 32),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, side: THREE.DoubleSide })
     )
     this.ring.rotation.x = -Math.PI / 2
     this.ring.position.y = 0.08
     this.ring.visible = false
 
-    this.group.add(this.glow, this.ring, body, head, this.indicator)
+    // Selection beacon — a tall glowing pillar so a selected agent is easy to
+    // spot from anywhere in the office. Hidden until selected.
+    this.beacon = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.12, 0.12, 9, 12, 1, true),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff, transparent: true, opacity: 0.28,
+        side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending,
+      })
+    )
+    this.beacon.position.y = 5.4
+    this.beacon.visible = false
+
+    this.group.add(this.glow, this.ring, this.beacon, body, head, this.indicator)
 
     // Movement state
     this.pos = new THREE.Vector3()
@@ -101,6 +113,7 @@ export class AgentAvatar {
   setSelected(on) {
     this.selected = on
     this.ring.visible = on
+    this.beacon.visible = on
   }
 
   // Pick a random point inside a zone's footprint.
@@ -191,8 +204,11 @@ export class AgentAvatar {
     // Glow breathing
     this.glow.material.opacity = 0.16 + Math.abs(Math.sin(t * 1.5)) * 0.14
 
-    // Selection ring spin
-    if (this.selected) this.ring.rotation.z = t * 1.5
+    // Selection ring spin + beacon pulse
+    if (this.selected) {
+      this.ring.rotation.z = t * 1.5
+      this.beacon.material.opacity = 0.18 + Math.abs(Math.sin(t * 2.5)) * 0.22
+    }
   }
 
   dispose() {

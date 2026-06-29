@@ -24,17 +24,19 @@ const COL = {
 
 // Zone layout: world coordinates (x,z) for the center of each zone.
 // Tuned so zones don't overlap and the courtyard sits in the middle.
+// Each zone carries a `purpose` shown as a small subtitle on its floor, so the
+// office is self-documenting: location = activity.
 export const ZONE_LAYOUT = {
-  reception:  { x: 0,    z: 22,  w: 16, d: 8,  color: COL.accentBlue,  label: 'RECEPTION' },
-  lounge:     { x: -22,  z: 12,  w: 14, d: 12, color: COL.accentTeal,  label: 'LOUNGE' },
-  designers:  { x: 22,   z: 12,  w: 14, d: 12, color: COL.accentBlue,  label: 'DESIGNERS' },
-  library:    { x: -22,  z: -8,  w: 14, d: 12, color: COL.accentAmber, label: 'LIBRARY' },
-  cafe:       { x: 22,   z: -8,  w: 14, d: 12, color: COL.accentGreen, label: 'CAFÉ' },
-  jira:       { x: -22,  z: -28, w: 14, d: 12, color: COL.accentBlue,  label: 'JIRA FLOOR' },
-  office:     { x: 22,   z: -28, w: 14, d: 12, color: COL.accentTeal,  label: 'PRIVATE OFFICE' },
-  conference: { x: 0,    z: -36, w: 18, d: 10, color: COL.accentAmber, label: 'CONFERENCE HALL' },
-  playroom:   { x: 0,    z: 4,   w: 12, d: 10, color: COL.accentGreen, label: 'PLAY ROOM' },
-  courtyard:  { x: 0,    z: -12, w: 14, d: 14, color: COL.accentTeal,  label: 'COURTYARD' },
+  reception:  { x: 0,    z: 22,  w: 16, d: 8,  color: COL.accentBlue,  label: 'RECEPTION',       purpose: 'arrivals' },
+  lounge:     { x: -22,  z: 12,  w: 14, d: 12, color: COL.accentTeal,  label: 'LOUNGE',          purpose: 'idle / social' },
+  designers:  { x: 22,   z: 12,  w: 14, d: 12, color: COL.accentBlue,  label: 'DESIGNERS',       purpose: 'build & code' },
+  library:    { x: -22,  z: -8,  w: 14, d: 12, color: COL.accentAmber, label: 'LIBRARY',         purpose: 'research' },
+  cafe:       { x: 22,   z: -8,  w: 14, d: 12, color: COL.accentGreen, label: 'CAFÉ',            purpose: 'idle / social' },
+  jira:       { x: -22,  z: -28, w: 14, d: 12, color: COL.accentBlue,  label: 'JIRA FLOOR',      purpose: 'fact-check' },
+  office:     { x: 22,   z: -28, w: 14, d: 12, color: COL.accentTeal,  label: 'PRIVATE OFFICE',  purpose: 'focus work' },
+  conference: { x: 0,    z: -36, w: 18, d: 10, color: COL.accentAmber, label: 'CONFERENCE HALL', purpose: 'verify' },
+  playroom:   { x: 0,    z: 4,   w: 12, d: 10, color: COL.accentGreen, label: 'PLAY ROOM',       purpose: 'idle / social' },
+  courtyard:  { x: 0,    z: -12, w: 14, d: 14, color: COL.accentTeal,  label: 'COURTYARD',       purpose: 'idle / social' },
 }
 
 function mat(color, opts = {}) {
@@ -57,23 +59,36 @@ function cyl(rTop, rBot, h, color, opts, seg = 16) {
   return new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBot, h, seg), mat(color, opts))
 }
 
-// A glowing canvas-text label that floats above each zone.
-function makeLabel(text, color = '#9fb6d6') {
+// A glowing canvas-text label that floats above each zone: the zone NAME plus a
+// smaller PURPOSE subtitle (e.g. "LIBRARY" / "research").
+function makeLabel(text, color = '#9fb6d6', sub = '') {
   const canvas = document.createElement('canvas')
-  canvas.width = 512; canvas.height = 96
+  canvas.width = 512; canvas.height = 128
   const ctx = canvas.getContext('2d')
-  ctx.clearRect(0, 0, 512, 96)
-  ctx.font = '600 46px ui-monospace, monospace'
-  ctx.fillStyle = color
+  ctx.clearRect(0, 0, 512, 128)
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
+
+  // Zone name
+  ctx.font = '600 44px ui-monospace, monospace'
+  ctx.fillStyle = color
   ctx.shadowColor = color
   ctx.shadowBlur = 18
-  ctx.fillText(text, 256, 52)
+  ctx.fillText(text, 256, sub ? 44 : 64)
+
+  // Purpose subtitle
+  if (sub) {
+    ctx.font = '500 26px ui-monospace, monospace'
+    ctx.shadowBlur = 8
+    ctx.fillStyle = 'rgba(220, 232, 248, 0.72)'
+    ctx.shadowColor = 'rgba(0,0,0,0.6)'
+    ctx.fillText('· ' + sub + ' ·', 256, 92)
+  }
+
   const tex = new THREE.CanvasTexture(canvas)
   tex.anisotropy = 4
   const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }))
-  spr.scale.set(10, 1.9, 1)
+  spr.scale.set(10, 2.5, 1)
   return spr
 }
 
@@ -208,9 +223,9 @@ export function buildOffice() {
     border.position.y = 0.04
     zg.add(border)
 
-    // Floating label
-    const label = makeLabel(z.label, '#' + z.color.toString(16).padStart(6, '0'))
-    label.position.set(0, 4.6, 0)
+    // Floating label (name + purpose subtitle)
+    const label = makeLabel(z.label, '#' + z.color.toString(16).padStart(6, '0'), z.purpose)
+    label.position.set(0, 4.8, 0)
     zg.add(label)
 
     // Zone-specific furniture
