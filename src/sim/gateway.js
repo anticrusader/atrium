@@ -149,6 +149,7 @@ export class MockGateway extends Emitter {
     a.taskId = t.id; a.task = t.title; a.zone = t.zone
     a.status = 'walking'; a._walk = 2 + r(2)
     t.state = 'assigned'; t.agentId = a.id
+    ;(t.log ??= []).push({ who: a.name, verb: 'picked up the task', what: '' })
     return true
   }
 
@@ -186,6 +187,7 @@ export class MockGateway extends Emitter {
         if (--a._beat > 0) continue
         t.state = 'done'; t.agentId = null; t.doneBy = a.name
         this._completed += 1
+        ;(t.log ??= []).push({ who: a.name, verb: 'completed the task', what: '' })
         events.push({ who: a.name, verb: 'completed', what: t.title })
         a.taskId = null; a.task = 'idle'; a.status = 'idle'
         a.zone = pick(['lounge', 'cafe', 'playroom', 'courtyard'])

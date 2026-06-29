@@ -112,29 +112,53 @@ export class Hud {
       if (row) this.openTask(row.dataset.taskid)
     })
     this.taskPanel.addEventListener('click', (e) => {
-      if (e.target.closest('[data-act="closetask"]')) this.closeTask()
+      if (e.target.closest('[data-act="closetask"]')) { this.closeTask(); return }
+      const link = e.target.closest('[data-taskid]') // follow a handoff link
+      if (link) this.openTask(link.dataset.taskid)
     })
   }
 
   openTask(id) { this._openTaskId = id; this._renderTaskPanel() }
   closeTask() { this._openTaskId = null; this.taskPanel.style.display = 'none' }
 
+  _nameOf(agentId) { return agentId ? (this._agents.find((a) => a.id === agentId)?.name || '—') : null }
+
   _renderTaskPanel() {
     const t = this._tasks.find((x) => x.id === this._openTaskId)
     if (!t) { this.taskPanel.style.display = 'none'; return }
-    const agent = t.agentId ? this._agents.find((a) => a.id === t.agentId)?.name : null
-    const who = agent || t.doneBy || '—'
+    const who = this._nameOf(t.agentId) || t.doneBy || '—'
     const pct = Math.round((t.progress || 0) * 100)
-    const lines = []
-    lines.push(`<div class="tp__meta">state: <b style="color:var(--ink)">${t.state}</b> · ${pct}%</div>`)
-    lines.push(`<div class="tp__meta">${t.state === 'done' ? 'completed by' : 'agent'}: ${esc(who)}</div>`)
-    if (t.topic) lines.push(`<div class="tp__meta">topic: ${esc(t.topic)}</div>`)
-    if (t.claim) lines.push(`<div class="tp__meta">claim: ${esc(t.claim)}</div>`)
-    if (t.stage > 1 || t.parent) lines.push(`<div class="tp__meta">stage ${t.stage} · handed off from a prior task</div>`)
-    if (t.finding) lines.push(`<div class="tp__block"><div class="tp__lbl">prior verdict</div>${esc(t.finding)}</div>`)
-    if (t.result) lines.push(`<div class="tp__block"><div class="tp__lbl">result</div>${esc(t.result)}</div>`)
-    if (Array.isArray(t.scratch) && t.scratch.length) {
-      lines.push(`<div class="tp__lbl">steps</div><ol class="tp__steps">${t.scratch.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>`)
+    const parent = t.parent ? this._tasks.find((x) => x.id === t.parent) : null
+    const children = this._tasks.filter((x) => x.parent === t.id)
+    const roleLabel = t.state === 'done' ? 'completed by' : t.agentId ? 'working on it' : 'unassigned'
+
+    const out = []
+    out.push(`<div class="tp__meta">state: <b style="color:var(--ink)">${t.state}</b> · ${pct}%</div>`)
+    out.push(`<div class="tp__meta">${roleLabel}: <b style="color:var(--ink)">${esc(who)}</b></div>`)
+    if (t.topic) out.push(`<div class="tp__meta">topic: ${esc(t.topic)}</div>`)
+    if (t.claim) out.push(`<div class="tp__meta">claim: ${esc(t.claim)}</div>`)
+    if (parent) out.push(`<div class="tp__meta">↳ handed off from <span class="tp__link" data-taskid="${parent.id}">${esc(parent.title)}</span></div>`)
+    if (t.finding) out.push(`<div class="tp__block"><div class="tp__lbl">verdict it received</div>${esc(t.finding)}</div>`)
+    if (t.result) out.push(`<div class="tp__block"><div class="tp__lbl">result</div>${esc(t.result)}</div>`)
+
+    // Per-task activity timeline: who did what, in order.
+    if (Array.isArray(t.log) && t.log.length) {
+      out.push('<div class="tp__lbl">activity</div><ul class="tp__log">')
+      for (const e of t.log) out.push(`<li><b>${esc(e.who)}</b> ${esc(e.verb)} ${e.what ? esc(e.what) : ''}</li>`)
+      out.push('</ul>')
+    }
+
+    // Handoffs: which agent it was handed to, and what they did (click to follow).
+    if (children.length) {
+      out.push('<div class="tp__lbl">handed off to</div>')
+      for (const c of children) {
+        const cwho = c.doneBy || this._nameOf(c.agentId) || 'waiting for an agent'
+        out.push(`<div class="tp__child">
+          <span class="tp__link" data-taskid="${c.id}">${esc(c.title)}</span>
+          <div class="tp__meta">→ ${esc(cwho)} · ${c.state}</div>
+          ${c.result ? `<div class="tp__cres">${esc(c.result)}</div>` : ''}
+        </div>`)
+      }
     }
 
     this.taskPanel.innerHTML = `
@@ -143,7 +167,7 @@ export class Hud {
         <button class="tp__x" data-act="closetask" title="close">✕</button>
       </div>
       <div class="tp__title">${esc(t.title)}</div>
-      ${lines.join('')}
+      ${out.join('')}
     `
     this.taskPanel.style.display = 'block'
   }

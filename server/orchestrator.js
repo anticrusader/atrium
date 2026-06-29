@@ -11,7 +11,7 @@
 // Real orchestrators (CI schedulers, k8s, actor supervisors) run this same
 // loop. Everything else is policy plugged into step 2.
 
-import { Agent, simulatedExecutor } from './agent-runtime.js'
+import { Agent, simulatedExecutor, logTask } from './agent-runtime.js'
 import { STATUS, TASK_STATE, ZONE_KEYS } from './protocol.js'
 
 const TASK_TITLES = [
@@ -170,6 +170,7 @@ export class Orchestrator {
         { silent: true }
       )
       v._exclude = doer // don't let the stage-1 agent verify its own work
+      logTask(t, 'system', 'handed off →', v.title)
       events.push({ who: 'handoff', verb: 'handed off', what: `fact-check → independent verify of "${t.claim}"` })
       return
     }
@@ -187,6 +188,7 @@ export class Orchestrator {
       { title: followTitle, zone: pick(['conference', 'jira', 'office']), stage: 2, parent: t.id },
       { silent: true }
     )
+    logTask(t, 'system', 'handed off →', follow.title)
     events.push({ who: 'handoff', verb: 'handed off', what: `${t.title} → ${follow.title}` })
   }
 

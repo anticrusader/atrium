@@ -158,7 +158,7 @@ export async function factCheckStep({ task, chat, limiter }) {
 export async function verifyStep({ task, chat, limiter }) {
   try {
     if (!task.phase) {
-      const second = await secondSource(task.claim)
+      const second = await secondSource(task.claim, task.topic)
       task._src2 = second?.text || ''
       task._src2name = second?.src || 'no second source'
       task.phase = 'judge'

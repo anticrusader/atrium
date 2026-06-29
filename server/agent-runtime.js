@@ -22,6 +22,12 @@ const PLATFORMS = ['discord','api','telegram','cli','web','matrix']
 const r = (n) => Math.floor(Math.random() * n)
 const pick = (a) => a[r(a.length)]
 
+// Append an entry to a task's activity log (a per-task timeline of who did what).
+export function logTask(task, who, verb, what = '') {
+  ;(task.log ??= []).push({ who, verb, what })
+  if (task.log.length > 16) task.log.shift()
+}
+
 // The default executor: pretends to do one unit of work per call and returns a
 // short human-readable line describing what "happened". Replace `step` to do
 // real work (call a model, run a tool, hit an API). It must stay non-blocking
@@ -93,6 +99,7 @@ export class Agent {
     this._result = null
     task.state = TASK_STATE.ASSIGNED
     task.agentId = this.id
+    logTask(task, this.name, 'picked up the task')
   }
 
   // Advance one tick. `board` lets the agent update its task + report a feed
@@ -135,7 +142,10 @@ export class Agent {
         if (this._result) {
           const { delta, note } = this._result
           this._result = null
-          if (delta > 0) task.progress = Math.min(1, task.progress + delta)
+          if (delta > 0) {
+            task.progress = Math.min(1, task.progress + delta)
+            logTask(task, this.name, '—', note) // record what the agent just did
+          }
           if (task.progress >= 1) {
             this.status = STATUS.MESSAGING
             this._beat = 1
@@ -164,6 +174,7 @@ export class Agent {
         task.state = TASK_STATE.DONE
         task.doneBy = this.name // remember who finished it (for the task detail)
         task.agentId = null
+        logTask(task, this.name, 'completed the task')
         const title = task.title
         const doneId = task.id
         this.taskId = null

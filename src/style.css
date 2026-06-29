@@ -345,6 +345,21 @@ html, body {
 .tp__block { font-size: 12px; color: var(--ink); background: rgba(255, 255, 255, 0.04); border: 1px solid var(--panel-edge); border-radius: 8px; padding: 9px 11px; margin: 9px 0; line-height: 1.5; }
 .tp__lbl { font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--ink-dim); margin: 6px 0 4px; }
 .tp__steps { margin: 4px 0 0; padding-left: 18px; font-size: 11px; color: var(--ink); line-height: 1.5; }
+.tp__log { list-style: none; margin: 4px 0 0; padding: 0; }
+.tp__log li {
+  font-size: 11px; color: var(--ink-dim); line-height: 1.45;
+  padding: 4px 0 4px 12px; position: relative;
+  border-left: 1px solid var(--panel-edge); margin-left: 3px;
+}
+.tp__log li::before {
+  content: ''; position: absolute; left: -4px; top: 9px;
+  width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+}
+.tp__log li b { color: var(--ink); font-weight: 600; }
+.tp__link { color: var(--accent); cursor: pointer; text-decoration: underline dotted; }
+.tp__link:hover { color: var(--teal); }
+.tp__child { border: 1px solid var(--panel-edge); border-radius: 8px; padding: 8px 10px; margin: 6px 0; }
+.tp__cres { font-size: 11px; color: var(--ink); margin-top: 5px; line-height: 1.45; }
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
