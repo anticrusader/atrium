@@ -17,9 +17,7 @@ function boot() {
   const world = new World(stage)
   const hud = new Hud(hudRoot)
   const gateway = createGateway()
-  const controls = new Controls(hudRoot, (type, payload) => gateway.send(type, payload), {
-    onSelectNone: () => world.select(null),
-  })
+  const controls = new Controls(hudRoot, (type, payload) => gateway.send(type, payload))
 
   let lastRecords = []
 
@@ -29,8 +27,10 @@ function boot() {
     else hud.showTag(null)
   })
 
-  // Click an agent → pin selection and open its command panel.
-  world.onSelect((record) => controls.select(record))
+  // Selection is two-way: clicking an agent in 3D highlights its row in the
+  // directory, and clicking a directory row highlights the agent in 3D.
+  world.onSelect((record) => controls.setSelected(record ? record.id : null))
+  controls.onPick((id) => world.select(id))
 
   // Full snapshot: build avatars + seed HUD.
   gateway.on('snapshot', ({ agents, tasks, host, version }) => {
@@ -42,6 +42,7 @@ function boot() {
     hud.update({ agents, host, active })
     hud.updateBoard(tasks)
     controls.setTasks(tasks)
+    controls.setRoster(agents)
     requestAnimationFrame(() => veil.classList.add('hidden'))
     setTimeout(() => veil.remove(), 800)
   })
@@ -55,9 +56,7 @@ function boot() {
     hud.updateBoard(tasks)
     hud.pushEvents(events)
     controls.setTasks(tasks)
-    // keep the selected-agent panel live as its status changes
-    const sel = world.selectedId()
-    if (sel) controls.refresh(agents.find((a) => a.id === sel))
+    controls.setRoster(agents) // live roster keeps the directory + selected row fresh
   })
 
   world.start()

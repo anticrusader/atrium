@@ -201,6 +201,15 @@ export class Orchestrator {
   pause(agentId) { const a = this.agents.get(agentId); if (a) { a.pause(); return true } return false }
   resume(agentId) { const a = this.agents.get(agentId); if (a) { a.resume(); return true } return false }
 
+  rename(agentId, name) {
+    const a = this.agents.get(agentId)
+    if (!a || !name || !String(name).trim()) return false
+    const old = a.name
+    a.name = String(name).trim().slice(0, 40)
+    this._log({ who: 'orchestrator', verb: 'renamed', what: `${old} → ${a.name}` })
+    return true
+  }
+
   move(agentId, zone) {
     const a = this.agents.get(agentId)
     if (!a || !ZONE_KEYS.includes(zone)) return false
@@ -230,6 +239,7 @@ export class Orchestrator {
       case 'pause': return this.pause(payload.agentId)
       case 'resume': return this.resume(payload.agentId)
       case 'move': return this.move(payload.agentId, payload.zone)
+      case 'rename': return this.rename(payload.agentId, payload.name)
       case 'set_auto': this.setAuto(payload.enabled); return true
       case 'reset': this.reset(); return true
       default: return false

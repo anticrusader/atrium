@@ -132,6 +132,7 @@ export class MockGateway extends Emitter {
       case COMMAND.PAUSE: { const a = this._agent(payload.agentId); if (a && a.status !== 'paused') { a._resume = a.status; a.status = 'paused' } break }
       case COMMAND.RESUME: { const a = this._agent(payload.agentId); if (a && a.status === 'paused') a.status = a._resume ?? 'idle'; break }
       case COMMAND.MOVE: { const a = this._agent(payload.agentId); if (a) { a.zone = payload.zone; if (a.status === 'idle') a.status = 'idle' } break }
+      case COMMAND.RENAME: { const a = this._agent(payload.agentId); if (a && payload.name) a.name = String(payload.name).trim().slice(0, 40); break }
       case COMMAND.SET_AUTO: this.autoAssign = !!payload.enabled; break
       case COMMAND.RESET: this._tasks = []; this._taskSeq = 0; this._agents.forEach((a) => { a.taskId = null; a.task = 'idle'; a.status = 'idle' }); break
     }

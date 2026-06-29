@@ -71,8 +71,10 @@ falls back to the in-browser simulation.
   input** — name your own agent, type a task title, a research topic, or a claim
   to fact-check (leave blank for a random one). Your input flows straight into
   the real pipeline (e.g. a typed topic is the actual Wikipedia search).
-- **Click an agent** to select it, then from its panel: **pause / resume**,
-  **assign** the next task, **send to** any zone, or **remove** it.
+- **Agent directory** (left): a scrollable list of every agent (name + live
+  status). Click a row — or click the agent in the 3D office — to select it
+  (the two stay in sync) and expand its details + actions: **pause / resume**,
+  **✎ rename**, **assign** the next task, **send to** any zone, **✕ remove**.
 - Or from the browser console: `__agora.gateway.send('spawn', { count: 5 })`.
 
 ---

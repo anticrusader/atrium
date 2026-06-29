@@ -65,6 +65,7 @@ export const COMMAND = Object.freeze({
   PAUSE: 'pause',           // { agentId }
   RESUME: 'resume',         // { agentId }
   MOVE: 'move',             // { agentId, zone }     send an agent to a zone
+  RENAME: 'rename',         // { agentId, name }     rename an agent
   SET_AUTO: 'set_auto',     // { enabled }           toggle the auto-dispatcher
   RESET: 'reset',           // {}                    clear tasks, idle everyone
 })

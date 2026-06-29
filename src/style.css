@@ -250,6 +250,59 @@ html, body {
   background: rgba(255,255,255,0.05);
 }
 
+/* ---------- Agent directory (left) ---------- */
+.directory {
+  top: 132px; left: 18px;
+  width: 264px;
+  max-height: calc(100vh - 320px);
+  display: flex;
+  flex-direction: column;
+  padding: 12px 8px 10px 14px;
+}
+.dir__head {
+  font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--ink-dim); margin-bottom: 8px; padding-right: 6px;
+}
+.dir__head span { color: var(--ink); }
+.dir__list {
+  list-style: none; margin: 0; padding: 0 6px 0 0;
+  overflow-y: auto; flex: 1;
+}
+.dir__list::-webkit-scrollbar { width: 6px; }
+.dir__list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
+.dir__item {
+  border-radius: 8px;
+  margin-bottom: 2px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.dir__item:hover { background: rgba(255,255,255,0.05); }
+.dir__item.sel { background: rgba(90,184,255,0.12); }
+.dir__row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px; font-size: 12px;
+}
+.dir__dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.dir__name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dir__st { font-size: 9px; text-transform: lowercase; }
+.dir__detail { padding: 2px 8px 10px; }
+.dir__meta { font-size: 10px; color: var(--ink-dim); margin-bottom: 3px; }
+.dir__acts { display: flex; flex-wrap: wrap; gap: 5px; margin: 9px 0 7px; }
+.dir__acts button {
+  font-family: var(--mono); font-size: 10px; color: var(--ink);
+  background: rgba(90,184,255,0.12); border: 1px solid var(--panel-edge);
+  border-radius: 7px; padding: 5px 8px; cursor: pointer;
+}
+.dir__acts button:hover { background: rgba(90,184,255,0.26); }
+.dir__acts button.danger { background: rgba(255,107,122,0.14); border-color: rgba(255,107,122,0.3); }
+.dir__acts button.danger:hover { background: rgba(255,107,122,0.3); }
+.dir__move {
+  width: 100%; font-family: var(--mono); font-size: 10px;
+  color: var(--ink); background: rgba(255,255,255,0.05);
+  border: 1px solid var(--panel-edge); border-radius: 7px; padding: 5px 7px; cursor: pointer;
+}
+.dir__move option { background: #0a1322; color: var(--ink); }
+
 /* ---------- Task board (right) ---------- */
 .board {
   top: 18px; right: 274px;
