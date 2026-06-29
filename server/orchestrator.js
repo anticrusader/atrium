@@ -11,7 +11,7 @@
 // Real orchestrators (CI schedulers, k8s, actor supervisors) run this same
 // loop. Everything else is policy plugged into step 2.
 
-import { Agent, simulatedExecutor, logTask } from './agent-runtime.js'
+import { Agent, simulatedExecutor, logTask, setAgentCounter } from './agent-runtime.js'
 import { STATUS, TASK_STATE, ZONE_KEYS } from './protocol.js'
 
 const TASK_TITLES = [
@@ -65,14 +65,57 @@ export class Orchestrator {
     this.version = 'v0.1.0 · pre-release'
     this._feed = []         // recent activity lines
     this._completed = 0     // cumulative completed count (done objects are pruned)
+    // NOTE: seeding is NOT done here — server/index.js calls seed() for a fresh
+    // start or hydrate() to restore a saved world (see persistence below).
+  }
 
-    // Seed a small fleet so the office isn't empty on first connect.
-    const n = opts.fleet ?? 5
-    for (let i = 0; i < n; i++) this.spawn(1, { silent: true })
-    // Seed a small backlog — a couple simulated + one of each real kind.
+  // Fresh start: a small fleet + a small backlog.
+  seed(fleet = 5) {
+    for (let i = 0; i < fleet; i++) this.spawn(1, { silent: true })
     for (let i = 0; i < 2; i++) this.createTask({}, { silent: true })
     this.createTask({ kind: 'research' }, { silent: true })
     this.createTask({ kind: 'factcheck' }, { silent: true })
+  }
+
+  // ── Persistence ──────────────────────────────────────────────────────────
+  // A serializable snapshot of the whole world, and its inverse.
+  toState() {
+    return {
+      v: 1,
+      agents: [...this.agents.values()].map((a) => a.toState()),
+      tasks: this._wireTasks(),
+      completed: this._completed,
+      autoAssign: this.autoAssign,
+    }
+  }
+
+  hydrate(state) {
+    this.agents.clear()
+    this.tasks.clear()
+    for (const rec of state.agents || []) {
+      const a = new Agent({
+        id: rec.id, name: rec.name, model: rec.model,
+        platform: rec.platform, zone: rec.zone, executor: this.executor,
+      })
+      a.status = rec.status || STATUS.IDLE
+      a.taskId = rec.taskId ?? null
+      a.task = rec.task || 'idle'
+      a.uptime = rec.uptime || 0
+      this.agents.set(a.id, a)
+    }
+    for (const t of state.tasks || []) this.tasks.set(t.id, t)
+    this._completed = state.completed || 0
+    if (typeof state.autoAssign === 'boolean') this.autoAssign = state.autoAssign
+
+    // Restore id counters so newly created ids can't collide with restored ones.
+    const maxNum = (keys, re) => keys.reduce((m, k) => {
+      const x = parseInt((String(k).match(re) || [])[1] ?? '-1', 10)
+      return x > m ? x : m
+    }, -1)
+    const aMax = maxNum([...this.agents.keys()], /a0*(\d+)/)
+    if (aMax >= 0) setAgentCounter(aMax)
+    const tMax = maxNum([...this.tasks.keys()], /t0*(\d+)/)
+    if (tMax >= 0) _taskSeq = tMax
   }
 
   // ── Command handlers (the control plane) ─────────────────────────────────

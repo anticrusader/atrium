@@ -46,6 +46,10 @@ export const simulatedExecutor = {
 
 let _counter = 0
 
+// Restore the id counter after loading saved agents, so newly spawned agents
+// don't reuse an existing id.
+export function setAgentCounter(n) { _counter = n }
+
 export class Agent {
   constructor(opts = {}) {
     _counter += 1
@@ -210,6 +214,22 @@ export class Agent {
       status: this.status,
       task: this.task,
       taskId: this.taskId,
+      uptime: this.uptime,
+    }
+  }
+
+  // Persistable snapshot (raw fields — keeps the cosmetic model label, not the
+  // executor-derived one; excludes transient in-flight call state).
+  toState() {
+    return {
+      id: this.id,
+      name: this.name,
+      model: this.model,
+      platform: this.platform,
+      zone: this.zone,
+      status: this.status,
+      taskId: this.taskId,
+      task: this.task,
       uptime: this.uptime,
     }
   }

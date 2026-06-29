@@ -11,10 +11,12 @@
 // to) the simulated Orchestrator, you could bridge inbound agent telemetry from
 // Hermes processes here and forward commands to them.
 
+import { fileURLToPath } from 'node:url'
 import { WebSocketServer } from 'ws'
 import { Orchestrator } from './orchestrator.js'
 import { Metrics } from './metrics.js'
 import { makeLLMExecutor } from './executor.js'
+import { loadState, saveState } from './store.js'
 import { EVENT, event, isCommand } from './protocol.js'
 
 // Load .env (Node 20.6+: no dependency needed). Safe if the file is absent.
@@ -58,11 +60,23 @@ function buildExecutor() {
 
 const { executor, label } = buildExecutor()
 const orchestrator = new Orchestrator({
-  fleet: Number(process.env.FLEET ?? 5), // small, simple start (override with FLEET=)
   executor: executor ?? undefined,
   maxConcurrent: Number(process.env.MAX_CONCURRENT ?? 6),
 })
 if (executor) orchestrator.version = `v0.1.0 · ${label} (live)`
+
+// Persistence: restore the saved world if present, else seed a fresh fleet.
+// The fleet + task board survive restarts (state in server/state.json).
+const STATE_FILE = fileURLToPath(new URL('./state.json', import.meta.url))
+const saved = loadState(STATE_FILE)
+if (saved && Array.isArray(saved.agents) && saved.agents.length) {
+  orchestrator.hydrate(saved)
+  console.log(`  [state] restored ${saved.agents.length} agents + ${(saved.tasks || []).length} tasks from state.json`)
+} else {
+  orchestrator.seed(Number(process.env.FLEET ?? 5))
+  console.log('  [state] no saved world → seeded a fresh fleet')
+}
+
 const metrics = new Metrics()
 
 const wss = new WebSocketServer({ host: HOST, port: PORT })
@@ -103,4 +117,13 @@ setInterval(() => {
   broadcast(event(EVENT.TICK, payload))
 }, TICK_MS)
 
-process.on('SIGINT', () => { console.log('\n  orchestrator stopped'); process.exit(0) })
+// Autosave the world so it survives restarts.
+setInterval(() => saveState(STATE_FILE, orchestrator.toState()), 5000)
+
+function shutdown() {
+  saveState(STATE_FILE, orchestrator.toState()) // flush before exiting
+  console.log('\n  state saved · orchestrator stopped')
+  process.exit(0)
+}
+process.on('SIGINT', shutdown)
+process.on('SIGTERM', shutdown)

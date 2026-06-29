@@ -8,3 +8,7 @@ dist/
 .env
 .env.*
 !.env.example
+
+# Persisted runtime world (fleet + task board) — machine-local, not source.
+server/state.json
+server/state.json.tmp
