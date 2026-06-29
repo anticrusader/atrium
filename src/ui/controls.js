@@ -83,12 +83,15 @@ export class Controls {
     `
     this.list = this.dir.querySelector('#dir-list')
 
-    // Click: a row toggles selection; a button runs an action.
+    // Click handling. A button runs an action. ONLY the compact header toggles
+    // selection — clicks inside the expanded detail (especially the dropdown)
+    // must NOT toggle the row shut, or the dropdown would close the instant it
+    // opens (the click bubbles up here).
     this.list.addEventListener('click', (e) => {
       const btn = e.target.closest('button[data-act]')
       if (btn) { e.stopPropagation(); this._action(btn.dataset.act, btn.closest('[data-id]').dataset.id); return }
-      const row = e.target.closest('[data-id]')
-      if (row) this._select(row.dataset.id)
+      const head = e.target.closest('.dir__row')
+      if (head) this._select(head.closest('[data-id]').dataset.id)
     })
     // Send-to-zone dropdown.
     this.list.addEventListener('change', (e) => {
