@@ -93,13 +93,34 @@ If hosted free models are too throttled, run locally with Ollama
 `LLM_BASE_URL=http://localhost:11434/v1`, `LLM_MODEL=hermes3:8b`,
 `OPENROUTER_API_KEY=ollama` (any non-empty string).
 
-## Possible NEXT STEPS (not done)
+## Agent-to-agent handoff + WIP cap — DONE
 
-- Agent-to-agent handoff: on completion, an agent creates a follow-up task for a
-  teammate (a 2-stage pipeline). The `MESSAGING` state is the natural hook.
+- **WIP / concurrency cap** (`Orchestrator.maxConcurrent`, env `MAX_CONCURRENT`,
+  default 6): the dispatcher won't run more than N tasks at once. This fixes the
+  "18 in-progress, nothing moving" look under a rate-limited model — a few tasks
+  progress and complete while the rest of the fleet idles in social zones.
+- **Handoff**: when a stage-1 task completes, `Orchestrator._maybeHandoff()`
+  (~45%) creates a stage-2 follow-up task (`review:`/`QA:`/`write up:` …) that a
+  *different* idle agent picks up — a 2-stage pipeline. Chains stop at stage 2.
+  The dispatcher prioritizes stage-2 tasks so pipelines drain. Verified: 63
+  completions → 22 handoffs in a 140-tick simulated run.
+- `executor.js` `maxSteps` lowered to 3 (fewer calls per task → faster drain).
+
+### Free-tier reality (important)
+Free `:free` models share GLOBAL capacity and the daily ~200-request cap is easy
+to hit with an 18-agent fleet. When all models in `LLM_MODEL` are 429, the board
+legitimately stalls (zero progress) — this is the free tier, not a bug. Mitigate
+by lowering `MAX_CONCURRENT`/`LLM_RPM`, waiting for the daily reset, or using a
+LOCAL model (see RTX 3090 note above) which has no limits. DeepSeek V4 exists but
+`deepseek-v4-flash` is currently *paid-but-cheap* (~$0.09/M), not in the free
+catalog.
+
+## Possible NEXT STEPS (not done)
 - Priority / skill-based scheduling in `Orchestrator._dispatch()`.
-- Surface the *currently active* model (post-rotation) in the HUD, not just the
-  primary; executor already exposes `current()`.
+- Surface the *currently active* model (post-rotation) in the HUD; executor
+  exposes `current()`.
+- Graceful degradation: when fully rate-limited, optionally let agents make slow
+  clearly-tagged "(offline)" progress so the office never looks dead.
 
 ## Memory portability
 

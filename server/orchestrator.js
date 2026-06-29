@@ -34,6 +34,11 @@ export class Orchestrator {
     this.tasks = new Map()  // id -> task record
     this.executor = opts.executor ?? simulatedExecutor
     this.autoAssign = opts.autoAssign ?? true
+    // WIP limit: cap how many tasks run AT ONCE. With a rate-limited model, 18
+    // agents all working at once starves everyone and the board looks frozen.
+    // Capping concurrency lets a few tasks visibly progress and complete while
+    // the rest idle — a core orchestration concept (work-in-progress limits).
+    this.maxConcurrent = opts.maxConcurrent ?? 6
     this.version = 'v0.1.0 · pre-release'
     this._feed = []         // recent activity lines
 
@@ -69,7 +74,7 @@ export class Orchestrator {
     return true
   }
 
-  createTask({ title, zone } = {}, opts = {}) {
+  createTask({ title, zone, stage, parent } = {}, opts = {}) {
     _taskSeq += 1
     const task = {
       id: `t${_taskSeq.toString().padStart(3, '0')}`,
@@ -78,10 +83,33 @@ export class Orchestrator {
       state: TASK_STATE.BACKLOG,
       agentId: null,
       progress: 0,
+      stage: stage ?? 1,      // 1 = original work, 2 = a follow-up from a handoff
+      parent: parent ?? null, // the task this one was handed off from
     }
     this.tasks.set(task.id, task)
     if (!opts.silent) this._log({ who: 'board', verb: 'new task', what: task.title })
     return task
+  }
+
+  // Agent-to-agent handoff: when a stage-1 task finishes, the agent's output
+  // becomes the INPUT to a new follow-up task that a DIFFERENT idle agent will
+  // pick up. That is a two-stage pipeline — the essence of multi-agent
+  // collaboration. We cap it at stage 2 so chains don't grow forever.
+  _maybeHandoff(taskId, events) {
+    const t = this.tasks.get(taskId)
+    if (!t || (t.stage ?? 1) >= 2) return
+    if (Math.random() > 0.55) return // ~45% of finished work gets handed off
+    const followTitle = pick([
+      `review: ${t.title}`,
+      `write up: ${t.title}`,
+      `QA: ${t.title}`,
+      `summarize results of: ${t.title}`,
+    ])
+    const follow = this.createTask(
+      { title: followTitle, zone: pick(['conference', 'jira', 'office']), stage: 2, parent: t.id },
+      { silent: true }
+    )
+    events.push({ who: 'handoff', verb: 'handed off', what: `${t.title} → ${follow.title}` })
   }
 
   assign(agentId, taskId) {
@@ -139,15 +167,22 @@ export class Orchestrator {
   // task priority, locality, fairness — but they all slot in right here.
   _dispatch() {
     if (!this.autoAssign) return
+    // WIP limit: don't exceed maxConcurrent tasks in flight at once.
+    const busy = [...this.agents.values()].filter((a) => a.taskId).length
+    let slots = this.maxConcurrent - busy
+    if (slots <= 0) return
     const idle = [...this.agents.values()].filter((a) => a.status === STATUS.IDLE)
     if (!idle.length) return
-    const backlog = [...this.tasks.values()].filter((t) => t.state === TASK_STATE.BACKLOG)
+    // Prefer stage-2 (handoff) tasks so pipelines flow to completion first.
+    const backlog = [...this.tasks.values()]
+      .filter((t) => t.state === TASK_STATE.BACKLOG)
+      .sort((a, b) => (b.stage ?? 1) - (a.stage ?? 1))
     let i = 0
     for (const task of backlog) {
-      if (i >= idle.length) break
+      if (i >= idle.length || slots <= 0) break
       idle[i].assign(task)
       this._log({ who: idle[i].name, verb: 'picked up', what: task.title })
-      i++
+      i++; slots--
     }
   }
 
@@ -160,7 +195,11 @@ export class Orchestrator {
     const events = []
     for (const a of this.agents.values()) {
       const line = a.tick(this.tasks)
-      if (line) events.push(line)
+      if (line) {
+        events.push(line)
+        // When a task completes, maybe hand its result to a teammate.
+        if (line.verb === 'completed' && line.taskId) this._maybeHandoff(line.taskId, events)
+      }
     }
     events.forEach((e) => this._log(e))
 

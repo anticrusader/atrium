@@ -162,6 +162,7 @@ export class Agent {
         task.state = TASK_STATE.DONE
         task.agentId = null
         const title = task.title
+        const doneId = task.id
         this.taskId = null
         this.task = 'idle'
         this.status = STATUS.IDLE
@@ -169,7 +170,8 @@ export class Agent {
         this._result = null
         // idle agents drift to a social zone
         this.zone = pick(['lounge', 'cafe', 'playroom', 'courtyard'])
-        return { who: this.name, verb: 'completed', what: title }
+        // taskId lets the orchestrator decide on an agent-to-agent handoff.
+        return { who: this.name, verb: 'completed', what: title, taskId: doneId }
       }
 
       default:

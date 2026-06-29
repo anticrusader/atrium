@@ -49,7 +49,7 @@ class RateLimiter {
  * @param {number} [cfg.maxSteps] force task completion after this many steps
  */
 export function makeLLMExecutor(cfg) {
-  const { apiKey, baseURL, rpm = 15, maxInFlight = 4, maxSteps = 5 } = cfg
+  const { apiKey, baseURL, rpm = 15, maxInFlight = 4, maxSteps = 3 } = cfg
   // `model` may be a single id or a comma-separated fallback list. Free models
   // get upstream-rate-limited individually, so we rotate to the next on failure.
   const models = (Array.isArray(cfg.model) ? cfg.model : String(cfg.model).split(','))

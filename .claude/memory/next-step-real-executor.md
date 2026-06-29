@@ -14,4 +14,8 @@ Verified: live model output flows into the activity feed (real reasoning sentenc
 **Run live:** key in `.env` → `npm run dev:all` → open `?feed=ws://127.0.0.1:8787`.
 **Local fallback** (user's RTX 3090 24GB): Ollama `hermes3:8b`, set `LLM_BASE_URL=http://localhost:11434/v1`, `LLM_MODEL=hermes3:8b`, `OPENROUTER_API_KEY=ollama`.
 
-Next ideas (not done): agent-to-agent handoff (completed agent creates a follow-up task — MESSAGING state is the hook); priority/skill scheduling in `Orchestrator._dispatch()`; surface the post-rotation *active* model in the HUD (executor exposes `current()`).
+UPDATE (2026-06-29): also DONE — (a) **WIP/concurrency cap** (`Orchestrator.maxConcurrent`, env `MAX_CONCURRENT` default 6) so the board doesn't look frozen when the model is rate-limited; (b) **agent-to-agent handoff** (`_maybeHandoff`: a completed stage-1 task spawns a stage-2 `review:`/`QA:` follow-up that another idle agent picks up — 2-stage pipeline, capped at stage 2). Verified 63 completions → 22 handoffs in a 140-tick sim run.
+
+Free-tier reality observed: with 18 agents the ~200/day OpenRouter free cap gets exhausted and ALL `:free` models 429 → board legitimately stalls (not a bug). DeepSeek V4 exists but `deepseek-v4-flash` is paid-but-cheap (~$0.09/M), NOT free in the catalog. The real unthrottled path is LOCAL Ollama on the RTX 3090.
+
+Next ideas (not done): priority/skill scheduling in `_dispatch()`; surface post-rotation active model in HUD; graceful "(offline)" degradation when fully rate-limited.

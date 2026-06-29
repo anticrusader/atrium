@@ -43,7 +43,11 @@ function buildExecutor() {
 }
 
 const { executor, label } = buildExecutor()
-const orchestrator = new Orchestrator({ fleet: 18, executor: executor ?? undefined })
+const orchestrator = new Orchestrator({
+  fleet: 18,
+  executor: executor ?? undefined,
+  maxConcurrent: Number(process.env.MAX_CONCURRENT ?? 6),
+})
 if (executor) orchestrator.version = `v0.1.0 · ${label} (live)`
 const metrics = new Metrics()
 
