@@ -113,15 +113,28 @@ export class Controls {
     this.list = this.dir.querySelector('#dir-list')
     this.skillsPanel = this.dir.querySelector('#skills-panel')
 
-    // Skills panel: one row per user-defined skill, each with a one-click "+ task"
-    // that puts that skill's specialist on a new piece of work.
+    // Skills panel: each row has a one-click "+ task" (puts the skill's
+    // specialist on new work — auto-spawning one if none exists yet), plus
+    // edit (re-prompt) and delete.
     this.skillsPanel.addEventListener('click', (e) => {
       const b = e.target.closest('button[data-skill]')
       if (!b) return
       const key = b.dataset.skill
       const name = b.dataset.name || key
-      const brief = window.prompt(`New task for "${name}":`)
-      if (brief && brief.trim()) this.send(COMMAND.CREATE_TASK, { kind: 'custom', skill: key, brief: brief.trim() })
+      if (b.dataset.act === 'skilltask') {
+        const brief = window.prompt(`New task for "${name}":`)
+        if (brief && brief.trim()) this.send(COMMAND.CREATE_TASK, { kind: 'custom', skill: key, brief: brief.trim() })
+      } else if (b.dataset.act === 'skilledit') {
+        const newName = window.prompt('Skill name:', name)
+        if (newName === null) return // cancelled
+        const newSystem = window.prompt(`New expertise for "${newName.trim() || name}" (blank = keep the current prompt):`, '')
+        if (newSystem === null) return // cancelled
+        this.send(COMMAND.DEFINE_SKILL, { key, name: newName.trim(), system: newSystem.trim() })
+      } else if (b.dataset.act === 'skilldel') {
+        if (window.confirm(`Delete skill "${name}"? Agents keep running but lose this capability.`)) {
+          this.send(COMMAND.DELETE_SKILL, { key })
+        }
+      }
     })
 
     // Click handling. A button runs an action. ONLY the compact header toggles
@@ -163,11 +176,16 @@ export class Controls {
         <div class="skills__empty">none yet — design one with <b>+ skill</b></div>`
       return
     }
-    const rows = list.map((s) => `
+    const rows = list.map((s) => {
+      const d = `data-skill="${esc(s.key)}" data-name="${esc(s.name)}"`
+      return `
       <div class="skill-row">
-        <span class="skill-row__name">${esc(s.name)}</span>
-        <button class="skill-row__add" data-skill="${esc(s.key)}" data-name="${esc(s.name)}" title="Give this skill a new task">+ task</button>
-      </div>`).join('')
+        <span class="skill-row__name" title="${esc(s.key)}">${esc(s.name)}</span>
+        <button class="skill-row__add" data-act="skilltask" ${d} title="Give this skill a new task">+ task</button>
+        <button class="skill-row__icon" data-act="skilledit" ${d} title="Edit this skill">✎</button>
+        <button class="skill-row__icon" data-act="skilldel" ${d} title="Delete this skill">✕</button>
+      </div>`
+    }).join('')
     this.skillsPanel.innerHTML = `<div class="skills__head">SKILLS <span>· ${list.length}</span></div>${rows}`
   }
 

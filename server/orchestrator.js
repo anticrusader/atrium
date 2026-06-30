@@ -166,19 +166,54 @@ export class Orchestrator {
     return created
   }
 
-  // Author a CUSTOM prompt-skill from the dashboard: a name + a system prompt
-  // (the expertise). No code — the executor's customStep runs the model with it.
+  // Author OR EDIT a CUSTOM prompt-skill from the dashboard: a name + a system
+  // prompt (the expertise). No code — the executor's customStep runs the model
+  // with it. Upserts by key: editing an existing skill may omit name/system to
+  // keep the current value (e.g. tweak the prompt without retyping the name).
   // Returns the stored skill record, or null if invalid.
   defineSkill({ key, name, system } = {}) {
-    const nm = String(name || '').trim()
-    const sys = String(system || '').trim()
     let k = String(key || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-    if (!k) k = nm.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-    if (!k || !nm || !sys) return null
+    if (!k) k = String(name || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+    if (!k) return null
+    const existing = this.customSkills.get(k)
+    const nm = String(name || '').trim() || existing?.name
+    const sys = String(system || '').trim() || existing?.system
+    if (!nm || !sys) return null // a brand-new skill needs both
     const rec = { key: k, name: nm, system: sys }
     this.customSkills.set(k, rec)
-    this._log({ who: 'orchestrator', verb: 'skill defined', what: `${nm} (${k})` })
+    // Keep any in-flight/backlog custom tasks for this skill in sync with the
+    // edited prompt (their server-side `_system` snapshot would otherwise stale).
+    for (const t of this.tasks.values()) if (t.kind === 'custom' && t.skill === k) t._system = sys
+    this._log({ who: 'orchestrator', verb: existing ? 'skill updated' : 'skill defined', what: `${nm} (${k})` })
     return rec
+  }
+
+  // Remove a custom prompt-skill and revoke it from any agent that holds it
+  // (those agents stay, just lose that capability). Tasks already done are
+  // untouched; their saved files remain.
+  deleteSkill(key) {
+    const k = String(key || '').trim()
+    const rec = this.customSkills.get(k)
+    if (!rec) return false
+    this.customSkills.delete(k)
+    for (const a of this.agents.values()) {
+      if (a.skills.includes(k)) a.skills = a.skills.filter((s) => s !== k)
+    }
+    this._log({ who: 'orchestrator', verb: 'skill removed', what: `${rec.name} (${k})` })
+    return true
+  }
+
+  // Make sure SOME agent can do `skill`; if none can, spawn a specialist for it.
+  // This is what lets "+ task" work even before you've spawned a specialist —
+  // the capability appears on demand. No-op for tasks that need no skill.
+  _ensureSpecialist(skill) {
+    if (!skill) return
+    if ([...this.agents.values()].some((a) => a.hasSkill(skill))) return
+    const label = this.customSkills.get(skill)?.name ||
+      ({ [SKILLS.RPA_ARCHITECT]: 'RPA Architect', [SKILLS.EMAIL]: 'Inbox Assistant' })[skill] ||
+      skill
+    this.spawn(1, { silent: true, name: label, skills: [skill] })
+    this._log({ who: 'orchestrator', verb: 'auto-spawned', what: `${label} for skill "${skill}"` })
   }
 
   // Grant/replace an agent's skills (capabilities). Lets an operator turn an
@@ -273,6 +308,9 @@ export class Orchestrator {
     // from the wire by _wireTasks); the executor reads it in customStep.
     if (k === 'custom') task._system = this.customSkills.get(skill)?.system
     this.tasks.set(task.id, task)
+    // If this task needs a skill nobody has yet, conjure a specialist on demand
+    // (so "+ task" works before you've spawned one).
+    this._ensureSpecialist(requiredSkill(task))
     if (!opts.silent) this._log({ who: 'board', verb: 'new task', what: task.title })
     return task
   }
@@ -374,6 +412,7 @@ export class Orchestrator {
       case 'rename': return this.rename(payload.agentId, payload.name)
       case 'set_skills': return this.setSkills(payload.agentId, payload.skills)
       case 'define_skill': return !!this.defineSkill(payload)
+      case 'delete_skill': return this.deleteSkill(payload.key)
       case 'set_auto': this.setAuto(payload.enabled); return true
       case 'reset': this.reset(); return true
       default: return false

@@ -67,7 +67,8 @@ export const COMMAND = Object.freeze({
   MOVE: 'move',             // { agentId, zone }     send an agent to a zone
   RENAME: 'rename',         // { agentId, name }     rename an agent
   SET_SKILLS: 'set_skills', // { agentId, skills }   set an agent's skills (capabilities)
-  DEFINE_SKILL: 'define_skill', // { key, name, system } author a custom prompt-skill
+  DEFINE_SKILL: 'define_skill', // { key, name, system } author/edit a custom prompt-skill
+  DELETE_SKILL: 'delete_skill', // { key }            remove a custom prompt-skill
   SET_AUTO: 'set_auto',     // { enabled }           toggle the auto-dispatcher
   RESET: 'reset',           // {}                    clear tasks, idle everyone
 })

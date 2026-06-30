@@ -232,8 +232,17 @@ specialist agent with that skill, (3) optionally gives it a first task — no co
   custom skills like first-class specialists.
 - Executed by `server/custom-skill.js` `customStep` (the generic form of
   `rpa.js` — one model call grounded in the user's prompt; result saved to a file).
-- Verified live: defined a "SQL Expert" from the wire → specialist produced a
-  correct composite-index recommendation → saved to `server/outputs/`.
+- **Manage on the page:** the directory panel's **SKILLS** section lists every
+  custom skill with **+ task** / edit (✎) / delete (✕). `defineSkill` upserts by
+  key (edit = same key, blank prompt keeps the current one); `deleteSkill` removes
+  it and revokes it from any agent holding it.
+- **Auto-spawn on demand:** `createTask` calls `_ensureSpecialist(requiredSkill(t))`,
+  so creating skill-gated work (custom / rpa-design / email) when no agent owns
+  the skill conjures a named specialist for it — "+ task" works before you've
+  spawned anyone.
+- Verified live: defined "SQL Expert" → correct composite-index recommendation
+  saved to `server/outputs/`; defined "Legal Reviewer" with no manual spawn →
+  auto-spawned specialist picked up the task; deleting a skill revoked it cleanly.
 
 ### Skill: Outlook email — read + DRAFT-ONLY (`server/email.js`) — built, needs setup
 Skill key `email`, task kind `email`. Reads the Outlook inbox and DRAFTS a reply
