@@ -31,6 +31,11 @@ orchestrator publishes. The orchestrator is the **single source of truth**. One
 WebSocket carries both directions. The shared `protocol.js` is imported by both
 sides so message shapes can't drift.
 
+![System architecture](diagrams/01-system-architecture.png)
+
+<details>
+<summary>Mermaid source (edit here, then re-export — see top of file)</summary>
+
 ```mermaid
 flowchart LR
   subgraph Browser["🖥️ Dashboard (src/)"]
@@ -61,6 +66,8 @@ flowchart LR
   Exec --> Tools["real work<br/>research.js · rpa.js<br/>custom-skill.js · email.js"]
 ```
 
+</details>
+
 ---
 
 ## 2. The orchestration loop (one tick)
@@ -68,6 +75,11 @@ flowchart LR
 This four-step loop *is* the whole idea — the same shape every orchestrator uses
 (k8s, CI runners, actor supervisors). It runs every `TICK_MS` (~1.1s) in
 [`Orchestrator.tick()`](../server/orchestrator.js).
+
+![The orchestration loop (one tick)](diagrams/02-orchestration-loop.png)
+
+<details>
+<summary>Mermaid source (edit here, then re-export — see top of file)</summary>
 
 ```mermaid
 flowchart TB
@@ -95,6 +107,8 @@ flowchart TB
   PUB --> T
 ```
 
+</details>
+
 ---
 
 ## 3. An agent is a state machine
@@ -103,6 +117,11 @@ Each agent is one worker with a lifecycle ([`agent-runtime.js`](../server/agent-
 The key design point is the **WORKING** state: a real model call takes seconds,
 so the agent **fires the call once and stays put** while it's in flight, applying
 the result on a later tick — the tick loop never blocks.
+
+![Agent state machine](diagrams/03-agent-state-machine.png)
+
+<details>
+<summary>Mermaid source (edit here, then re-export — see top of file)</summary>
 
 ```mermaid
 stateDiagram-v2
@@ -125,6 +144,8 @@ stateDiagram-v2
   PAUSED --> IDLE: resume
 ```
 
+</details>
+
 > The `executor.step(agent, task)` call is **the seam for real work**. Swap what
 > it does and nothing else in the machine changes. See diagram 7.
 
@@ -135,6 +156,11 @@ stateDiagram-v2
 Declare intent, then observe reconciled state. The browser never mutates
 anything directly — it sends a command, gets an `ack`, and sees the change in the
 next `tick`. ([PROTOCOL.md](PROTOCOL.md))
+
+![Commands and events](diagrams/04-commands-and-events.png)
+
+<details>
+<summary>Mermaid source (edit here, then re-export — see top of file)</summary>
 
 ```mermaid
 sequenceDiagram
@@ -159,6 +185,8 @@ sequenceDiagram
   end
 ```
 
+</details>
+
 ---
 
 ## 5. What a *skill* is
@@ -166,6 +194,11 @@ sequenceDiagram
 A **skill = a capability + routing**. The capability is a task `kind` with a real
 `step()`; the routing is `requiredSkill(task)` gating *which* agent may take it.
 Two flavors:
+
+![What a skill is](diagrams/05-what-is-a-skill.png)
+
+<details>
+<summary>Mermaid source (edit here, then re-export — see top of file)</summary>
 
 ```mermaid
 flowchart TB
@@ -185,6 +218,8 @@ flowchart TB
   Route --> Map["SKILL_FOR_KIND (built-in)<br/>+ task.skill (custom)<br/>— unified by requiredSkill() in protocol.js"]
 ```
 
+</details>
+
 > Built-in skills need code because they **touch tools** (RPA reasoning, the
 > Microsoft Graph API). Custom skills are pure expertise — *just a system
 > prompt* — so they can be designed live in the browser.
@@ -195,6 +230,11 @@ flowchart TB
 
 `_dispatch()` is where scheduling policy lives. A skill-gated task only goes to a
 capable agent; if none exists, a specialist is **auto-spawned on demand**.
+
+![Skill-based dispatch](diagrams/06-skill-dispatch.png)
+
+<details>
+<summary>Mermaid source (edit here, then re-export — see top of file)</summary>
 
 ```mermaid
 flowchart TB
@@ -209,6 +249,8 @@ flowchart TB
   Assign --> Done
 ```
 
+</details>
+
 > WIP cap: the loop stops once `maxConcurrent` tasks are in flight, so under a
 > rate-limited model a few tasks visibly progress while the rest idle.
 
@@ -220,6 +262,11 @@ Skill `rpa-architect`, task kind `rpa-design`
 ([`server/rpa.js`](../server/rpa.js)). A pure-expertise skill: the value is the
 senior-architect **system prompt**. It runs in two real model calls over two
 ticks, then the design is saved as a file.
+
+![RPA Architect skill flow](diagrams/07-rpa-architect-flow.png)
+
+<details>
+<summary>Mermaid source (edit here, then re-export — see top of file)</summary>
 
 ```mermaid
 sequenceDiagram
@@ -249,12 +296,19 @@ sequenceDiagram
   Art-->>Ag: server/outputs/<id>-rpa-design-….md
 ```
 
+</details>
+
 ---
 
 ## 8. Design a skill on the page (custom prompt-skills)
 
 The `+ skill` button turns "a name + an expertise prompt" into a working
 specialist — no code, no restart. ([`server/custom-skill.js`](../server/custom-skill.js))
+
+![Custom prompt-skill flow](diagrams/08-custom-skill-flow.png)
+
+<details>
+<summary>Mermaid source (edit here, then re-export — see top of file)</summary>
 
 ```mermaid
 sequenceDiagram
@@ -283,6 +337,8 @@ sequenceDiagram
   U->>C: ✎ edit prompt (define_skill upsert) · ✕ delete (delete_skill)
 ```
 
+</details>
+
 ---
 
 ## 9. Multi-agent handoff (fact-check → verify)
@@ -290,6 +346,11 @@ sequenceDiagram
 Real collaboration on real data: agent A reaches a verdict, then a **different**
 agent B independently verifies it against a second source.
 ([`server/research.js`](../server/research.js), `_maybeHandoff` in orchestrator)
+
+![Fact-check to verify handoff](diagrams/09-handoff-factcheck-verify.png)
+
+<details>
+<summary>Mermaid source (edit here, then re-export — see top of file)</summary>
 
 ```mermaid
 flowchart LR
@@ -304,6 +365,8 @@ flowchart LR
   V1 --> Out["✅ / ❌ in the feed"]
 ```
 
+</details>
+
 > Skill-gated specialist work (rpa-design, email, custom) does **not** get a
 > generic narrated handoff — it stands on its own.
 
@@ -316,6 +379,11 @@ completes with a `task.result`, it's written to a Markdown file *before* the tas
 is pruned. The ambient research/fact-check churn is **not** filed (it would flood
 the folder). ([`server/artifacts.js`](../server/artifacts.js))
 
+![Results become files](diagrams/10-deliverables.png)
+
+<details>
+<summary>Mermaid source (edit here, then re-export — see top of file)</summary>
+
 ```mermaid
 flowchart TB
   Done["task completes with task.result"] --> Q{"requiredSkill(task)?<br/>(rpa-design / email / custom)"}
@@ -324,6 +392,8 @@ flowchart TB
   Save --> File["📄 server/outputs/&lt;id&gt;-&lt;kind&gt;-&lt;subject&gt;.md<br/>header + the full result"]
   File --> Panel["path shown in the task-detail panel:<br/>📄 saved to …"]
 ```
+
+</details>
 
 ---
 
