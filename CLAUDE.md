@@ -13,8 +13,10 @@ repo is `anticrusader/atrium` (the local folder may still be named `hermesagora`
 
 **Why it exists:** the owner is using it to **learn agent orchestration
 hands-on**. Prioritize clarity and teachability over cleverness. The teaching
-guide in [docs/ORCHESTRATION.md](docs/ORCHESTRATION.md) is a first-class artifact
-— keep it accurate as the code evolves.
+guide in [docs/ORCHESTRATION.md](docs/ORCHESTRATION.md) and the visual
+[docs/DIAGRAMS.md](docs/DIAGRAMS.md) (Mermaid: system, the loop, agent FSM,
+skills, dispatch, RPA/custom-skill flows, handoff, deliverables) are first-class
+artifacts — keep them accurate as the code evolves.
 
 ## Architecture (one screen)
 

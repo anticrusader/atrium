@@ -4,6 +4,10 @@ A hands-on guide. Every concept here maps to a file you can open, read, and
 change. By the end you'll know what an orchestrator *is*, how to build one, and
 how to turn the simulated agents in this project into real ones.
 
+> 📊 Prefer pictures? **[DIAGRAMS.md](DIAGRAMS.md)** visualizes everything below —
+> the system, the tick loop, the agent state machine, skills, dispatch, the
+> RPA/custom-skill flows, multi-agent handoff, and how results become files.
+
 ---
 
 ## 1. What "orchestration" actually means
