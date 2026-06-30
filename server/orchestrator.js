@@ -554,10 +554,19 @@ export class Orchestrator {
     }
   }
 
-  // Custom prompt-skills for the wire. Includes the system prompt so the UI can
-  // show + edit it (it's the user's own authored text, not a secret).
+  // The full skill catalog for the wire: BUILT-IN skills (code-backed — rpa,
+  // email — shown so the panel is complete, but not editable) followed by the
+  // user's CUSTOM prompt-skills (with their system prompt, so the UI can edit
+  // them). `kind` tells the UI which task kind a "+ task" should create.
   _skillCatalog() {
-    return [...this.customSkills.values()].map((s) => ({ key: s.key, name: s.name, system: s.system }))
+    const builtins = [
+      { key: SKILLS.RPA_ARCHITECT, name: 'RPA Architect', kind: 'rpa-design', builtin: true },
+      { key: SKILLS.EMAIL, name: 'Inbox Assistant', kind: 'email', builtin: true },
+    ]
+    const customs = [...this.customSkills.values()].map((s) => ({
+      key: s.key, name: s.name, system: s.system, kind: 'custom', builtin: false,
+    }))
+    return [...builtins, ...customs]
   }
 
   // Serialize tasks for the wire, dropping bulky internal fields (e.g. the

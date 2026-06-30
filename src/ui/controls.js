@@ -122,8 +122,13 @@ export class Controls {
       const key = b.dataset.skill
       const name = b.dataset.name || key
       if (b.dataset.act === 'skilltask') {
+        const kind = b.dataset.kind || 'custom'
+        // Email triages the inbox — no brief needed; others take a brief.
+        if (kind === 'email') { this.send(COMMAND.CREATE_TASK, { kind: 'email' }); return }
         const brief = window.prompt(`New task for "${name}":`)
-        if (brief && brief.trim()) this.send(COMMAND.CREATE_TASK, { kind: 'custom', skill: key, brief: brief.trim() })
+        if (!brief || !brief.trim()) return
+        if (kind === 'custom') this.send(COMMAND.CREATE_TASK, { kind: 'custom', skill: key, brief: brief.trim() })
+        else this.send(COMMAND.CREATE_TASK, { kind, brief: brief.trim() }) // built-in (e.g. rpa-design)
       } else if (b.dataset.act === 'skilledit') {
         const sk = (this._skills || []).find((s) => s.key === key) || { key, name, system: '' }
         this._openSkillEditor(sk)
@@ -204,7 +209,7 @@ export class Controls {
     this._skills = list // keep the full records (incl. system prompt) for the editor
     // Cheap change-detection so we don't rebuild the rows (and their buttons)
     // every tick — only when the visible catalog (keys/names) actually changes.
-    const sig = list.map((s) => `${s.key}:${s.name}`).join('|')
+    const sig = list.map((s) => `${s.key}:${s.name}:${s.builtin ? 'b' : 'c'}`).join('|')
     if (sig === this._skillsSig) return
     this._skillsSig = sig
     if (!list.length) {
@@ -213,13 +218,17 @@ export class Controls {
       return
     }
     const rows = list.map((s) => {
-      const d = `data-skill="${esc(s.key)}" data-name="${esc(s.name)}"`
+      const d = `data-skill="${esc(s.key)}" data-name="${esc(s.name)}" data-kind="${esc(s.kind || 'custom')}"`
+      // Built-in skills are code-backed: a "built-in" tag, no edit/delete.
+      const tag = s.builtin ? '<span class="skill-row__tag">built-in</span>' : ''
+      const manage = s.builtin ? '' :
+        `<button class="skill-row__icon" data-act="skilledit" ${d} title="Edit this skill">✎</button>
+         <button class="skill-row__icon" data-act="skilldel" ${d} title="Delete this skill">✕</button>`
       return `
       <div class="skill-row">
-        <span class="skill-row__name" title="${esc(s.key)}">${esc(s.name)}</span>
+        <span class="skill-row__name" title="${esc(s.key)}">${esc(s.name)}${tag}</span>
         <button class="skill-row__add" data-act="skilltask" ${d} title="Give this skill a new task">+ task</button>
-        <button class="skill-row__icon" data-act="skilledit" ${d} title="Edit this skill">✎</button>
-        <button class="skill-row__icon" data-act="skilldel" ${d} title="Delete this skill">✕</button>
+        ${manage}
       </div>`
     }).join('')
     this.skillsPanel.innerHTML = `<div class="skills__head">SKILLS <span>· ${list.length}</span></div>${rows}`
