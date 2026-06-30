@@ -5,6 +5,12 @@ Visual companion to [ORCHESTRATION.md](ORCHESTRATION.md) and
 Diagrams are [Mermaid](https://mermaid.js.org/) — they render on GitHub and in
 most Markdown viewers.
 
+> 🖼️ **Image exports:** every diagram below is also rendered to PNG in
+> [`docs/diagrams/`](diagrams/) (e.g. `01-system-architecture.png`) — handy for
+> slides, issues, or any viewer that doesn't render Mermaid. Regenerate them with
+> `npx @mermaid-js/mermaid-cli -i docs/DIAGRAMS.md -o docs/diagrams/out.png` or
+> the per-file `.mmd` workflow.
+
 Jump to: [System](#1-system-architecture) ·
 [The loop](#2-the-orchestration-loop-one-tick) ·
 [Agent](#3-an-agent-is-a-state-machine) ·
