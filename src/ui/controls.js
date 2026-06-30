@@ -125,11 +125,8 @@ export class Controls {
         const brief = window.prompt(`New task for "${name}":`)
         if (brief && brief.trim()) this.send(COMMAND.CREATE_TASK, { kind: 'custom', skill: key, brief: brief.trim() })
       } else if (b.dataset.act === 'skilledit') {
-        const newName = window.prompt('Skill name:', name)
-        if (newName === null) return // cancelled
-        const newSystem = window.prompt(`New expertise for "${newName.trim() || name}" (blank = keep the current prompt):`, '')
-        if (newSystem === null) return // cancelled
-        this.send(COMMAND.DEFINE_SKILL, { key, name: newName.trim(), system: newSystem.trim() })
+        const sk = (this._skills || []).find((s) => s.key === key) || { key, name, system: '' }
+        this._openSkillEditor(sk)
       } else if (b.dataset.act === 'skilldel') {
         if (window.confirm(`Delete skill "${name}"? Agents keep running but lose this capability.`)) {
           this.send(COMMAND.DELETE_SKILL, { key })
@@ -157,8 +154,46 @@ export class Controls {
       sel.value = ''
     })
 
-    this.root.append(this.toolbar, this.dir)
+    // ── Skill editor modal (edit a skill's name + system prompt) ──
+    this.skillModal = el('div', 'skill-modal')
+    this.skillModal.style.display = 'none'
+    this.skillModal.innerHTML = `
+      <div class="skill-modal__box">
+        <div class="skill-modal__title">Edit skill</div>
+        <label class="skill-modal__lbl">Name</label>
+        <input class="skill-modal__name" type="text" maxlength="40" />
+        <label class="skill-modal__lbl">System prompt — the expertise this specialist works from</label>
+        <textarea class="skill-modal__sys" rows="9" spellcheck="false"></textarea>
+        <div class="skill-modal__acts">
+          <button data-act="skill-cancel" class="ghost">cancel</button>
+          <button data-act="skill-save" class="primary">save changes</button>
+        </div>
+      </div>`
+    this.skillModal.addEventListener('click', (e) => {
+      if (e.target === this.skillModal || e.target.closest('[data-act="skill-cancel"]')) { this._closeSkillEditor(); return }
+      if (e.target.closest('[data-act="skill-save"]')) {
+        const nm = this.skillModal.querySelector('.skill-modal__name').value.trim()
+        const sys = this.skillModal.querySelector('.skill-modal__sys').value.trim()
+        if (!nm || !sys) { this.skillModal.querySelector(sys ? '.skill-modal__name' : '.skill-modal__sys').focus(); return }
+        this.send(COMMAND.DEFINE_SKILL, { key: this._editKey, name: nm, system: sys })
+        this._closeSkillEditor()
+      }
+    })
+
+    this.root.append(this.toolbar, this.dir, this.skillModal)
   }
+
+  _openSkillEditor(sk) {
+    this._editKey = sk.key
+    this.skillModal.querySelector('.skill-modal__title').textContent = `Edit skill — ${sk.name}`
+    this.skillModal.querySelector('.skill-modal__name').value = sk.name || ''
+    this.skillModal.querySelector('.skill-modal__sys').value = sk.system || ''
+    this.skillModal.style.display = 'flex'
+    const ta = this.skillModal.querySelector('.skill-modal__sys')
+    ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length)
+  }
+
+  _closeSkillEditor() { this.skillModal.style.display = 'none'; this._editKey = null }
 
   setTasks(tasks) { this._tasks = tasks || [] }
 
@@ -166,8 +201,9 @@ export class Controls {
   // gets a one-click "+ task" button. No-op'd to a hint when there are none.
   setSkills(skills) {
     const list = skills || []
+    this._skills = list // keep the full records (incl. system prompt) for the editor
     // Cheap change-detection so we don't rebuild the rows (and their buttons)
-    // every tick — only when the catalog actually changes.
+    // every tick — only when the visible catalog (keys/names) actually changes.
     const sig = list.map((s) => `${s.key}:${s.name}`).join('|')
     if (sig === this._skillsSig) return
     this._skillsSig = sig

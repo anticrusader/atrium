@@ -298,6 +298,42 @@ html, body {
   transition: color 0.15s, border-color 0.15s;
 }
 .skill-row__icon:hover { color: var(--ink); border-color: var(--ink-dim); }
+
+/* Skill editor modal */
+.skill-modal {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(6, 10, 18, 0.66); backdrop-filter: blur(3px);
+}
+.skill-modal__box {
+  width: min(560px, 92vw);
+  background: var(--panel); border: 1px solid var(--panel-edge);
+  border-radius: 14px; padding: 18px 20px 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.skill-modal__title { font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 12px; }
+.skill-modal__lbl {
+  display: block; font-size: 10px; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--ink-dim); margin: 10px 0 4px;
+}
+.skill-modal__name, .skill-modal__sys {
+  width: 100%; box-sizing: border-box;
+  font-family: var(--mono); font-size: 12px; color: var(--ink);
+  background: rgba(255, 255, 255, 0.04); border: 1px solid var(--panel-edge);
+  border-radius: 8px; padding: 8px 10px; resize: vertical;
+}
+.skill-modal__name:focus, .skill-modal__sys:focus { outline: none; border-color: var(--teal); }
+.skill-modal__sys { line-height: 1.5; min-height: 120px; }
+.skill-modal__acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.skill-modal__acts button {
+  font-family: var(--mono); font-size: 11px; color: var(--ink);
+  background: rgba(90, 184, 255, 0.12); border: 1px solid var(--panel-edge);
+  border-radius: 8px; padding: 7px 14px; cursor: pointer; transition: background 0.15s;
+}
+.skill-modal__acts button.ghost { background: transparent; color: var(--ink-dim); }
+.skill-modal__acts button.primary { background: rgba(47, 230, 214, 0.16); border-color: rgba(47, 230, 214, 0.45); color: var(--teal); }
+.skill-modal__acts button:hover { background: rgba(90, 184, 255, 0.26); }
+.skill-modal__acts button.primary:hover { background: rgba(47, 230, 214, 0.3); }
 .dir__head span { color: var(--ink); }
 .dir__list {
   list-style: none; margin: 0; padding: 0 6px 0 0;

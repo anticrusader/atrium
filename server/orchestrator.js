@@ -554,9 +554,10 @@ export class Orchestrator {
     }
   }
 
-  // Custom prompt-skills for the wire (key + name only — never the prompt body).
+  // Custom prompt-skills for the wire. Includes the system prompt so the UI can
+  // show + edit it (it's the user's own authored text, not a secret).
   _skillCatalog() {
-    return [...this.customSkills.values()].map((s) => ({ key: s.key, name: s.name }))
+    return [...this.customSkills.values()].map((s) => ({ key: s.key, name: s.name, system: s.system }))
   }
 
   // Serialize tasks for the wire, dropping bulky internal fields (e.g. the
