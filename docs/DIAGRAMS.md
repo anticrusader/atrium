@@ -7,9 +7,9 @@ most Markdown viewers.
 
 > 🖼️ **Image exports:** every diagram below is also rendered to PNG in
 > [`docs/diagrams/`](diagrams/) (e.g. `01-system-architecture.png`) — handy for
-> slides, issues, or any viewer that doesn't render Mermaid. Regenerate them with
-> `npx @mermaid-js/mermaid-cli -i docs/DIAGRAMS.md -o docs/diagrams/out.png` or
-> the per-file `.mmd` workflow.
+> slides, issues, or any viewer that doesn't render Mermaid. After editing any
+> Mermaid source below, regenerate the images with **`npm run diagrams`**
+> (renders every block via mermaid-cli; see [`diagrams/export.mjs`](diagrams/export.mjs)).
 
 Jump to: [System](#1-system-architecture) ·
 [The loop](#2-the-orchestration-loop-one-tick) ·
