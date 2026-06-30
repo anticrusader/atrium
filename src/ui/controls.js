@@ -106,10 +106,23 @@ export class Controls {
     // ── Agent directory ──
     this.dir = el('div', 'hud__panel directory')
     this.dir.innerHTML = `
+      <div class="skills" id="skills-panel"></div>
       <div class="dir__head">AGENTS <span id="dir-count">0</span></div>
       <ul class="dir__list" id="dir-list"></ul>
     `
     this.list = this.dir.querySelector('#dir-list')
+    this.skillsPanel = this.dir.querySelector('#skills-panel')
+
+    // Skills panel: one row per user-defined skill, each with a one-click "+ task"
+    // that puts that skill's specialist on a new piece of work.
+    this.skillsPanel.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-skill]')
+      if (!b) return
+      const key = b.dataset.skill
+      const name = b.dataset.name || key
+      const brief = window.prompt(`New task for "${name}":`)
+      if (brief && brief.trim()) this.send(COMMAND.CREATE_TASK, { kind: 'custom', skill: key, brief: brief.trim() })
+    })
 
     // Click handling. A button runs an action. ONLY the compact header toggles
     // selection — clicks inside the expanded detail (especially the dropdown)
@@ -135,6 +148,28 @@ export class Controls {
   }
 
   setTasks(tasks) { this._tasks = tasks || [] }
+
+  // Render the defined custom skills (sent on the wire as [{key, name}]). Each
+  // gets a one-click "+ task" button. No-op'd to a hint when there are none.
+  setSkills(skills) {
+    const list = skills || []
+    // Cheap change-detection so we don't rebuild the rows (and their buttons)
+    // every tick — only when the catalog actually changes.
+    const sig = list.map((s) => `${s.key}:${s.name}`).join('|')
+    if (sig === this._skillsSig) return
+    this._skillsSig = sig
+    if (!list.length) {
+      this.skillsPanel.innerHTML = `<div class="skills__head">SKILLS</div>
+        <div class="skills__empty">none yet — design one with <b>+ skill</b></div>`
+      return
+    }
+    const rows = list.map((s) => `
+      <div class="skill-row">
+        <span class="skill-row__name">${esc(s.name)}</span>
+        <button class="skill-row__add" data-skill="${esc(s.key)}" data-name="${esc(s.name)}" title="Give this skill a new task">+ task</button>
+      </div>`).join('')
+    this.skillsPanel.innerHTML = `<div class="skills__head">SKILLS <span>· ${list.length}</span></div>${rows}`
+  }
 
   // Called every tick/snapshot with the live roster.
   setRoster(agents) {

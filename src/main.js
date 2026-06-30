@@ -33,7 +33,7 @@ function boot() {
   controls.onPick((id) => world.select(id))
 
   // Full snapshot: build avatars + seed HUD.
-  gateway.on('snapshot', ({ agents, tasks, host, version, completed }) => {
+  gateway.on('snapshot', ({ agents, tasks, host, version, completed, skills }) => {
     if (version) hud.setVersion(version)
     hud.setMode(gateway.kind)
     world.spawn(agents)
@@ -42,13 +42,14 @@ function boot() {
     hud.update({ agents, host, active })
     hud.updateBoard(tasks, completed)
     controls.setTasks(tasks)
+    controls.setSkills(skills)
     controls.setRoster(agents)
     requestAnimationFrame(() => veil.classList.add('hidden'))
     setTimeout(() => veil.remove(), 800)
   })
 
   // Per-tick: reconcile avatars + refresh HUD, board, feed, and the open panel.
-  gateway.on('tick', ({ agents, tasks, host, active, events, completed }) => {
+  gateway.on('tick', ({ agents, tasks, host, active, events, completed, skills }) => {
     world.sync(agents)
     lastRecords = agents
     hud.setMode(gateway.kind) // kind can flip if a remote feed falls back to sim
@@ -56,6 +57,7 @@ function boot() {
     hud.updateBoard(tasks, completed)
     hud.pushEvents(events)
     controls.setTasks(tasks)
+    controls.setSkills(skills)
     controls.setRoster(agents) // live roster keeps the directory + selected row fresh
   })
 
