@@ -304,9 +304,11 @@ html, body {
   position: fixed; inset: 0; z-index: 50;
   display: flex; align-items: center; justify-content: center;
   background: rgba(6, 10, 18, 0.66); backdrop-filter: blur(3px);
+  pointer-events: auto; /* the HUD overlay sets none; re-enable for the modal */
 }
 .skill-modal__box {
   width: min(560px, 92vw);
+  max-height: 88vh; overflow-y: auto; /* long prompts scroll, never overflow */
   background: var(--panel); border: 1px solid var(--panel-edge);
   border-radius: 14px; padding: 18px 20px 16px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
