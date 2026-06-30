@@ -65,6 +65,10 @@ export class Agent {
     // Skills = capabilities this agent has (e.g. 'rpa-architect', 'email'). The
     // dispatcher uses them to route specialist work; see Orchestrator._dispatch.
     this.skills = Array.isArray(opts.skills) ? [...new Set(opts.skills)] : []
+    // If this agent was AUTO-spawned to cover a skill on demand, remember which
+    // one. Cleared the moment an operator renames it (i.e. makes it "theirs"), so
+    // deleting that skill only cleans up untouched, single-purpose specialists.
+    this.autoFor = opts.autoFor ?? null
     this.executor = opts.executor ?? simulatedExecutor
 
     // internal timers
@@ -238,6 +242,7 @@ export class Agent {
       task: this.task,
       uptime: this.uptime,
       skills: this.skills,
+      autoFor: this.autoFor,
     }
   }
 }

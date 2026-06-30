@@ -116,7 +116,7 @@ export class Orchestrator {
       const a = new Agent({
         id: rec.id, name: rec.name, model: rec.model,
         platform: rec.platform, zone: rec.zone, skills: rec.skills,
-        executor: this.executor,
+        autoFor: rec.autoFor, executor: this.executor,
       })
       a.status = rec.status || STATUS.IDLE
       a.taskId = rec.taskId ?? null
@@ -154,7 +154,8 @@ export class Orchestrator {
       // A name + skills are only applied when spawning a single agent.
       const name = opts.name && count === 1 ? opts.name : undefined
       const skills = count === 1 ? opts.skills : undefined
-      const a = new Agent({ executor: this.executor, zone: pick(ZONE_KEYS), name, skills })
+      const autoFor = count === 1 ? opts.autoFor : undefined
+      const a = new Agent({ executor: this.executor, zone: pick(ZONE_KEYS), name, skills, autoFor })
       this.agents.set(a.id, a)
       created.push(a)
     }
@@ -188,18 +189,26 @@ export class Orchestrator {
     return rec
   }
 
-  // Remove a custom prompt-skill and revoke it from any agent that holds it
-  // (those agents stay, just lose that capability). Tasks already done are
-  // untouched; their saved files remain.
+  // Remove a custom prompt-skill. For each agent that held it:
+  //   • if it was AUTO-spawned solely for this skill and never customized
+  //     (autoFor === key, no other skills, not renamed → autoFor still set),
+  //     remove the agent — it has no remaining purpose;
+  //   • otherwise keep the agent and just revoke the capability.
+  // Tasks already done are untouched; their saved files remain.
   deleteSkill(key) {
     const k = String(key || '').trim()
     const rec = this.customSkills.get(k)
     if (!rec) return false
     this.customSkills.delete(k)
+    const removeIds = []
     for (const a of this.agents.values()) {
-      if (a.skills.includes(k)) a.skills = a.skills.filter((s) => s !== k)
+      if (!a.skills.includes(k)) continue
+      if (a.autoFor === k && a.skills.length === 1) removeIds.push(a.id) // sole-purpose, untouched
+      else a.skills = a.skills.filter((s) => s !== k)                    // keep agent, revoke skill
     }
-    this._log({ who: 'orchestrator', verb: 'skill removed', what: `${rec.name} (${k})` })
+    for (const id of removeIds) this.kill(id) // returns any in-flight task to the backlog
+    const tail = removeIds.length ? ` · removed ${removeIds.length} auto-specialist(s)` : ''
+    this._log({ who: 'orchestrator', verb: 'skill removed', what: `${rec.name} (${k})${tail}` })
     return true
   }
 
@@ -212,7 +221,7 @@ export class Orchestrator {
     const label = this.customSkills.get(skill)?.name ||
       ({ [SKILLS.RPA_ARCHITECT]: 'RPA Architect', [SKILLS.EMAIL]: 'Inbox Assistant' })[skill] ||
       skill
-    this.spawn(1, { silent: true, name: label, skills: [skill] })
+    this.spawn(1, { silent: true, name: label, skills: [skill], autoFor: skill })
     this._log({ who: 'orchestrator', verb: 'auto-spawned', what: `${label} for skill "${skill}"` })
   }
 
@@ -222,6 +231,7 @@ export class Orchestrator {
     const a = this.agents.get(agentId)
     if (!a || !Array.isArray(skills)) return false
     a.skills = [...new Set(skills.filter((s) => typeof s === 'string' && s.trim()))]
+    a.autoFor = null // operator deliberately set its skills — it's no longer a disposable auto-specialist
     this._log({ who: 'orchestrator', verb: 'skills set', what: `${a.name} → ${a.skills.join(', ') || '(none)'}` })
     return true
   }
@@ -376,6 +386,7 @@ export class Orchestrator {
     if (!a || !name || !String(name).trim()) return false
     const old = a.name
     a.name = String(name).trim().slice(0, 40)
+    a.autoFor = null // you've customized it — it's no longer a disposable auto-specialist
     this._log({ who: 'orchestrator', verb: 'renamed', what: `${old} → ${a.name}` })
     return true
   }
