@@ -124,14 +124,24 @@ export class Orchestrator {
       a.uptime = rec.uptime || 0
       this.agents.set(a.id, a)
     }
+    let gc = 0
     for (const t of state.tasks || []) {
       // A persisted custom task lost its `_system` (stripped from the wire/state);
       // re-attach it from the restored skill registry so it can still run.
       if (t.kind === 'custom' && t.skill && !t._system) {
         t._system = (state.customSkills || []).find((s) => s.key === t.skill)?.system
       }
+      // Boot-time GC: a pending custom task whose skill no longer exists in the
+      // registry can never dispatch (its deleteSkill happened in a past run, or
+      // predates the cancel-on-delete fix). Drop it quietly — it's stale junk,
+      // not a live event worth a FAILED tombstone.
+      if (
+        t.kind === 'custom' && t.state === TASK_STATE.BACKLOG &&
+        !(state.customSkills || []).some((s) => s.key === t.skill)
+      ) { gc++; continue }
       this.tasks.set(t.id, t)
     }
+    if (gc) console.log(`  [state] dropped ${gc} orphaned custom task(s) (their skill was deleted)`)
     for (const s of state.customSkills || []) this.customSkills.set(s.key, s)
     this._completed = state.completed || 0
     if (typeof state.autoAssign === 'boolean') this.autoAssign = state.autoAssign
@@ -207,7 +217,21 @@ export class Orchestrator {
       else a.skills = a.skills.filter((s) => s !== k)                    // keep agent, revoke skill
     }
     for (const id of removeIds) this.kill(id) // returns any in-flight task to the backlog
-    const tail = removeIds.length ? ` · removed ${removeIds.length} auto-specialist(s)` : ''
+    // Cancel PENDING work for the deleted skill — a backlog task gated on a
+    // skill that no longer exists can never dispatch and would sit as a zombie
+    // (with the dispatcher warning about it forever). In-flight tasks finish:
+    // their agent already carries the prompt on task._system.
+    let cancelled = 0
+    for (const t of this.tasks.values()) {
+      if (t.kind === 'custom' && t.skill === k && t.state === TASK_STATE.BACKLOG) {
+        t.state = TASK_STATE.FAILED
+        logTask(t, 'orchestrator', 'cancelled —', `skill "${k}" was deleted`)
+        cancelled++
+      }
+    }
+    const tail =
+      (removeIds.length ? ` · removed ${removeIds.length} auto-specialist(s)` : '') +
+      (cancelled ? ` · cancelled ${cancelled} pending task(s)` : '')
     this._log({ who: 'orchestrator', verb: 'skill removed', what: `${rec.name} (${k})${tail}` })
     return true
   }

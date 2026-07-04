@@ -74,10 +74,12 @@ export class World {
   }
 
   _setupLights() {
-    const hemi = new THREE.HemisphereLight(0x9fc6ff, 0x0a1020, 0.55)
+    // Lifted from the original moody values — the office should read "awake":
+    // floors, agents and furniture visible at a glance, not silhouettes.
+    const hemi = new THREE.HemisphereLight(0x9fc6ff, 0x0a1020, 0.8)
     this.scene.add(hemi)
 
-    const key = new THREE.DirectionalLight(0xbfe3ff, 1.1)
+    const key = new THREE.DirectionalLight(0xbfe3ff, 1.35)
     key.position.set(30, 60, 20)
     key.castShadow = true
     key.shadow.mapSize.set(2048, 2048)
@@ -90,14 +92,14 @@ export class World {
     key.shadow.camera.bottom = -s
     this.scene.add(key)
 
-    const rim = new THREE.DirectionalLight(0x2fe6d6, 0.4)
+    const rim = new THREE.DirectionalLight(0x2fe6d6, 0.55)
     rim.position.set(-40, 30, -40)
     this.scene.add(rim)
 
     // Subtle accent point lights for atmosphere
-    const p1 = new THREE.PointLight(0x2fe6d6, 0.6, 60)
+    const p1 = new THREE.PointLight(0x2fe6d6, 0.9, 60)
     p1.position.set(-22, 8, 12)
-    const p2 = new THREE.PointLight(0x5ab8ff, 0.5, 60)
+    const p2 = new THREE.PointLight(0x5ab8ff, 0.75, 60)
     p2.position.set(22, 8, -28)
     this.scene.add(p1, p2)
   }

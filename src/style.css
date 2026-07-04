@@ -41,15 +41,49 @@ html, body {
   font-family: var(--mono);
 }
 
+/* Soft vignette: darkens the extremes so the lit office + panels pop. */
+.hud::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 58%, rgba(2, 4, 9, 0.5) 100%);
+}
+
 .hud__panel {
   position: absolute;
-  background: var(--panel);
-  border: 1px solid var(--panel-edge);
+  background: linear-gradient(155deg, rgba(14, 23, 40, 0.85), rgba(7, 12, 22, 0.78));
+  border: 1px solid rgba(120, 200, 255, 0.22);
   border-radius: 12px;
-  backdrop-filter: blur(10px) saturate(120%);
-  -webkit-backdrop-filter: blur(10px) saturate(120%);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(10px) saturate(130%);
+  -webkit-backdrop-filter: blur(10px) saturate(130%);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(160, 220, 255, 0.08),
+    0 0 24px rgba(47, 230, 214, 0.05);
   pointer-events: auto;
+}
+
+/* Sci-fi corner brackets (top-left + bottom-right) on every panel. */
+.hud__panel::before,
+.hud__panel::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+}
+.hud__panel::before {
+  top: -1px; left: -1px;
+  border-top: 2px solid rgba(47, 230, 214, 0.55);
+  border-left: 2px solid rgba(47, 230, 214, 0.55);
+  border-top-left-radius: 12px;
+}
+.hud__panel::after {
+  bottom: -1px; right: -1px;
+  border-bottom: 2px solid rgba(47, 230, 214, 0.55);
+  border-right: 2px solid rgba(47, 230, 214, 0.55);
+  border-bottom-right-radius: 12px;
 }
 
 /* Top-left brand + status */
@@ -62,6 +96,7 @@ html, body {
   font-size: 16px;
   letter-spacing: 2px;
   font-weight: 700;
+  text-shadow: 0 0 14px rgba(90, 184, 255, 0.35);
 }
 .brand__mark span { color: var(--teal); }
 .brand__sub {
@@ -97,7 +132,21 @@ html, body {
   color: var(--ink-dim);
   text-transform: uppercase;
   margin-bottom: 10px;
+  padding-left: 9px;
+  position: relative;
+  text-shadow: 0 0 10px rgba(47, 230, 214, 0.25);
 }
+/* Small teal accent tick before each section title — ties the HUD together. */
+.host__title::before, .roster__title::before, .focus__title::before,
+.dir__head::before, .skills__head::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 1px; bottom: 1px;
+  width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--teal), rgba(47, 230, 214, 0.15));
+}
+.dir__head, .skills__head { padding-left: 9px; position: relative; text-shadow: 0 0 10px rgba(47, 230, 214, 0.25); }
 .meter { margin-bottom: 10px; }
 .meter:last-child { margin-bottom: 0; }
 .meter__row {
@@ -227,9 +276,13 @@ html, body {
   border-radius: 8px;
   padding: 6px 11px;
   cursor: pointer;
-  transition: background 0.15s, transform 0.05s;
+  transition: background 0.15s, transform 0.05s, border-color 0.15s, box-shadow 0.15s;
 }
-.toolbar button:hover, .agentctl button:hover { background: rgba(90, 184, 255, 0.28); }
+.toolbar button:hover, .agentctl button:hover {
+  background: rgba(90, 184, 255, 0.28);
+  border-color: rgba(90, 184, 255, 0.55);
+  box-shadow: 0 0 14px rgba(90, 184, 255, 0.25);
+}
 .toolbar button:active, .agentctl button:active { transform: translateY(1px); }
 .toolbar button b { color: var(--teal); }
 .toolbar button.ghost { background: transparent; color: var(--ink-dim); }

@@ -13,10 +13,11 @@ function el(tag, cls, html) {
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 
+// Hex (not var()) so the fill can be composed into a gradient + glow inline.
 function meterColor(pct) {
-  if (pct < 55) return 'var(--green)'
-  if (pct < 80) return 'var(--amber)'
-  return 'var(--red)'
+  if (pct < 55) return '#57e08a'
+  if (pct < 80) return '#ffcf5c'
+  return '#ff6b7a'
 }
 
 function fmtUptime(sec) {
@@ -236,8 +237,11 @@ export class Hud {
     const f = this.root.querySelector(`#m-${id}-f`)
     if (v) v.textContent = `${pct}%`
     if (f) {
+      const c = meterColor(pct)
       f.style.width = `${pct}%`
-      f.style.background = meterColor(pct)
+      // Gradient fill with a soft glow at the leading edge — reads as "energy".
+      f.style.background = `linear-gradient(90deg, ${c}55, ${c})`
+      f.style.boxShadow = `0 0 10px ${c}55`
     }
   }
 

@@ -58,6 +58,18 @@ test('watchdog: a hung executor call fails the step instead of wedging the agent
   assert.equal(a.taskId, null)
 })
 
+test('deleting a skill cancels its pending tasks (no zombies)', () => {
+  const o = new Orchestrator({ executor: { step: async () => ({ delta: 1, note: 'ok' }) } })
+  o.setAuto(false)
+  o.defineSkill({ key: 'zeta', name: 'Zeta', system: 'You are Zeta.' })
+  const t = o.createTask({ kind: 'custom', skill: 'zeta', brief: 'pending work' }, { silent: true })
+  assert.equal(t.state, TASK_STATE.BACKLOG)
+
+  o.deleteSkill('zeta')
+  assert.equal(t.state, TASK_STATE.FAILED, 'pending task is cancelled, not left as a zombie')
+  assert.equal([...o.agents.values()].some((a) => a.hasSkill('zeta')), false, 'skill revoked everywhere')
+})
+
 test('manual assign honors the skill gate (and the specialist path works)', () => {
   const o = new Orchestrator({ executor: { step: async () => ({ delta: 1, note: 'ok' }) } })
   o.setAuto(false) // keep the dispatcher out of it
