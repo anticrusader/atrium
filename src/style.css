@@ -208,8 +208,17 @@ html, body {
   padding: 14px 16px;
   width: 320px;
   max-height: 230px;
+  /* Long feed lines (research summaries, verdicts) wrap over several rows —
+     the list must scroll INSIDE the panel, never spill past its border. */
+  display: flex;
+  flex-direction: column;
 }
-.feed { margin: 0; padding: 0; list-style: none; }
+.feed {
+  margin: 0; padding: 0 6px 0 0; list-style: none;
+  overflow-y: auto; flex: 1; min-height: 0;
+}
+.feed::-webkit-scrollbar { width: 6px; }
+.feed::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 3px; }
 .feed li {
   font-size: 11px;
   line-height: 1.5;
