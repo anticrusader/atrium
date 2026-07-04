@@ -41,6 +41,26 @@ async function wikiSummary(title) {
   return data?.extract ?? null
 }
 
+// FULL plain-text article extract (not just the intro summary). Fact-checks use
+// this: a true claim often lives deep in the article body, and judging it from
+// the ~1500-char summary alone produced honest-but-wrong "CONTRADICTED"
+// verdicts. Falls back to the summary if the extracts API fails.
+async function wikiFullText(title, maxChars = 4000) {
+  try {
+    const url = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1` +
+      `&redirects=1&titles=${encodeURIComponent(title)}&format=json`
+    const res = await fetch(url, { headers: UA })
+    if (res.ok) {
+      const data = await res.json()
+      const pages = data?.query?.pages || {}
+      const page = Object.values(pages)[0]
+      if (page?.extract) return page.extract.slice(0, maxChars)
+    }
+  } catch { /* fall through */ }
+  const summary = await wikiSummary(title)
+  return summary ? summary.slice(0, maxChars) : null
+}
+
 // A SECOND, independent retrieval path for verification — DuckDuckGo's Instant
 // Answer API, with a Wikipedia fallback. Retrieves by the SUBJECT (topic), not
 // the full claim sentence (which returns garbage matches). DDG is a separate
@@ -108,8 +128,9 @@ export async function researchStep({ task, chat, limiter }) {
 
     return { delta: 1, note: 'done' }
   } catch (err) {
-    task.phase = 'done'
-    return { delta: 1, note: `research error: ${err.message}` }
+    // A hard failure (network down, API error thrown). Signal it honestly —
+    // the orchestrator retries once, then marks the task FAILED.
+    return { failed: true, note: `research failed: ${err.message}` }
   }
 }
 
@@ -127,10 +148,12 @@ export async function factCheckStep({ task, chat, limiter }) {
       return { delta: 0.3, note: `looking into the claim — found source "${title}"` }
     }
     if (task.phase === 'read') {
-      const extract = await wikiSummary(task._title)
-      task._extract = (extract || '').slice(0, 1500)
+      // Full article text (capped), not just the intro — deeper grounding for
+      // the verdict. See wikiFullText.
+      const extract = await wikiFullText(task._title, 4000)
+      task._extract = extract || ''
       task.phase = 'assess'
-      return { delta: 0.3, note: `read "${task._title}" — ${task._extract.length} chars` }
+      return { delta: 0.3, note: `read "${task._title}" — ${task._extract.length} chars of article text` }
     }
     if (task.phase === 'assess') {
       if (!limiter.take()) return { delta: 0, note: '⏳ waiting for a model slot' }
@@ -146,8 +169,7 @@ export async function factCheckStep({ task, chat, limiter }) {
     }
     return { delta: 1, note: 'done' }
   } catch (err) {
-    task.phase = 'done'
-    return { delta: 1, note: `fact-check error: ${err.message}` }
+    return { failed: true, note: `fact-check failed: ${err.message}` }
   }
 }
 
@@ -179,7 +201,6 @@ export async function verifyStep({ task, chat, limiter }) {
     }
     return { delta: 1, note: 'done' }
   } catch (err) {
-    task.phase = 'done'
-    return { delta: 1, note: `verify error: ${err.message}` }
+    return { failed: true, note: `verify failed: ${err.message}` }
   }
 }

@@ -99,7 +99,9 @@ flowchart TB
     A2{"task completed?"}
     A3["💾 saveArtifact() if it has a result"]
     A4["🤝 _maybeHandoff() → stage-2 task"]
+    A5["🔁 _handleFailure():<br/>requeue once, then mark FAILED"]
     A1 --> A2 -- yes --> A3 --> A4
+    A1 -- "step failed /<br/>watchdog timeout" --> A5
   end
 
   A --> P["prune done tasks (keep last 40)<br/>+ trickle new demo work"]

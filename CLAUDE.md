@@ -263,15 +263,46 @@ needing a reply) → DRAFT (model writes the body; `createReply` + PATCH saves i
 - Status: code complete + gated; NOT yet verified live (needs the owner's Azure
   registration + sign-in). The "draft only, never auto-send" decision is baked in.
 
+## Fault tolerance + observability + tests — DONE
+
+The missing orchestration concepts (failure, retries, dead-lettering, telemetry)
+are now real:
+
+- **Failed steps are honest.** A real-work step that throws returns
+  `{ failed: true, note }` instead of faking a completion. The agent frees
+  itself and emits a `failed` event line; `Orchestrator._handleFailure()` owns
+  the policy: **requeue once** (attempt 2/2, progress/phase reset), then mark
+  the task `FAILED` (dead-letter). Failed tasks are pruned like done ones
+  (keep last 10). `task.attempts` persists.
+- **Watchdog.** If one executor call is in flight > `STEP_TIMEOUT_TICKS` (45,
+  ~50s), the agent gives up on it (`agent-runtime.js`) — a hung model call can
+  no longer wedge an agent in WORKING forever. A generation counter discards
+  the late result if it eventually lands (also guards results from a previous
+  task after reassignment).
+- **LLM telemetry in the HUD.** `tick`/`snapshot` payloads carry
+  `llm: { model, calls, errors, throttled }` from the shared executor (null in
+  simulation). The host panel shows `⚡ <active model> · N calls · N throttled` —
+  you can literally watch the fleet bottleneck on the shared rate limiter, and
+  the ACTIVE (post-rotation) model, which was a long-standing next-step.
+- **Board shows failure.** A 4th `failed` column + red `failed` badges/rows.
+- **Manual assign honors the skill gate** — the dropdown can no longer hand
+  specialist work to a generalist (`assign()` checks `requiredSkill`).
+- **Deeper fact-checks.** `factCheckStep` now reads the FULL article plain-text
+  extract (`wikiFullText`, capped 4000 chars, summary fallback) instead of the
+  ~1500-char intro — fixes true claims reading as CONTRADICTED because the
+  summary omitted them.
+- **Tests exist:** `npm test` (node --test, `test/orchestration.test.mjs`) —
+  deterministic, no network: retry→FAILED policy, the watchdog, and the manual
+  assign skill gate. Run them before committing orchestration changes.
+
 ## Possible NEXT STEPS (not done)
 - Finish the email skill: do the Azure app registration + `npm run email:login`,
   spawn an `email` specialist, and verify a real draft lands in Drafts.
 - More real task kinds (web search via Tavily/Brave, run a shell command, etc.).
-- Use fuller article text (not just the summary) for deeper fact-checks.
-- Surface the *currently active* model (post-rotation) in the HUD; executor
-  exposes `current()`.
 - Graceful degradation: when fully rate-limited, optionally let agents make slow
   clearly-tagged "(offline)" progress so the office never looks dead.
+- A "retry" button on FAILED tasks in the task detail panel (policy exists;
+  UI affordance doesn't).
 
 ## Memory portability
 

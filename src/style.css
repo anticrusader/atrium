@@ -400,6 +400,14 @@ html, body {
 .board__col small { font-size: 9px; color: var(--ink-dim); }
 .board__hot { color: var(--amber); }
 .board__ok { color: var(--green); }
+.board__bad { color: var(--red); }
+/* Live LLM telemetry line under the host meters (live backend only). */
+.host__llm {
+  margin-top: 9px; padding-top: 8px;
+  border-top: 1px solid var(--panel-edge);
+  font-size: 9px; color: var(--ink-dim); letter-spacing: .02em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .board__list { list-style: none; margin: 0; padding: 0; max-height: 230px; overflow-y: auto; }
 .board__list::-webkit-scrollbar { width: 6px; }
 .board__list::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 3px; }
@@ -412,6 +420,7 @@ html, body {
 .bd-fill { display: block; height: 100%; background: linear-gradient(90deg, var(--teal), var(--accent)); transition: width 0.5s; }
 .bd-badge { font-size: 8px; letter-spacing: 1px; text-transform: uppercase; color: var(--ink-dim); border: 1px solid var(--panel-edge); border-radius: 999px; padding: 2px 6px; flex: none; }
 .bd-done { color: var(--green); border-color: rgba(87, 224, 138, 0.3); }
+.bd-fail { color: var(--red); border-color: rgba(255, 107, 122, 0.35); }
 .bd-empty { color: var(--ink-dim); }
 .bd-row { cursor: pointer; border-radius: 6px; }
 .bd-row:hover { background: rgba(255, 255, 255, 0.06); }

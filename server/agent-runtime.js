@@ -44,6 +44,12 @@ export const simulatedExecutor = {
   },
 }
 
+// Watchdog: if one executor call is in flight for this many ticks (~50s at the
+// default TICK_MS), give up on it — otherwise a hung model call would leave the
+// agent stuck in WORKING forever. The late result (if it ever lands) is
+// discarded via a generation counter.
+const STEP_TIMEOUT_TICKS = 45
+
 let _counter = 0
 
 // Restore the id counter after loading saved agents, so newly spawned agents
@@ -76,6 +82,8 @@ export class Agent {
     this._beat = 0             // ticks until next think/work flip
     this._pending = false       // an async executor call is in flight
     this._result = null         // a resolved executor result awaiting apply
+    this._pendingTicks = 0      // how long the in-flight call has been pending
+    this._gen = 0               // bumping this discards any in-flight result
   }
 
   get busy() {
@@ -110,6 +118,8 @@ export class Agent {
     this._walk = 2 + r(2)
     this._pending = false
     this._result = null
+    this._pendingTicks = 0
+    this._gen++ // discard any still-in-flight result from a previous task
     task.state = TASK_STATE.ASSIGNED
     task.agentId = this.id
     logTask(task, this.name, 'picked up the task')
@@ -153,8 +163,23 @@ export class Agent {
         // over future ticks: while a call is in flight the agent simply stays
         // in WORKING. When the result lands we apply it on the next tick.
         if (this._result) {
-          const { delta, note } = this._result
+          const res = this._result
           this._result = null
+
+          // A HARD FAILURE (executor threw, or the watchdog fired). The agent
+          // frees itself; the ORCHESTRATOR owns the retry-or-give-up policy —
+          // it sees the `failed` flag on this event line and decides.
+          if (res.failed) {
+            logTask(task, this.name, 'step failed —', res.note)
+            const failedId = task.id
+            this.taskId = null
+            this.task = 'idle'
+            this.status = STATUS.IDLE
+            this._pending = false
+            return { who: this.name, verb: 'hit a failure', what: res.note, taskId: failedId, failed: true }
+          }
+
+          const { delta, note } = res
           if (delta > 0) {
             task.progress = Math.min(1, task.progress + delta)
             logTask(task, this.name, '—', note) // record what the agent just did
@@ -170,14 +195,25 @@ export class Agent {
           return delta > 0 ? { who: this.name, verb: 'working', what: note } : null
         }
 
-        if (!this._pending) {
-          this._pending = true
-          // Promise.resolve(...) handles both sync and async executors uniformly.
-          Promise.resolve()
-            .then(() => this.executor.step(this, task))
-            .then((res) => { this._result = res; this._pending = false })
-            .catch((err) => { this._result = { delta: 0.34, note: `error: ${err.message}` }; this._pending = false })
+        if (this._pending) {
+          // Watchdog: a call has been in flight too long — declare it failed and
+          // bump the generation so the late result (if any) is discarded.
+          if (++this._pendingTicks > STEP_TIMEOUT_TICKS) {
+            this._gen++
+            this._pending = false
+            this._result = { failed: true, note: `step timed out after ${STEP_TIMEOUT_TICKS} ticks (hung executor call)` }
+          }
+          return null
         }
+
+        this._pending = true
+        this._pendingTicks = 0
+        const gen = this._gen // capture: results from a stale generation are dropped
+        // Promise.resolve(...) handles both sync and async executors uniformly.
+        Promise.resolve()
+          .then(() => this.executor.step(this, task))
+          .then((res) => { if (gen !== this._gen) return; this._result = res; this._pending = false })
+          .catch((err) => { if (gen !== this._gen) return; this._result = { failed: true, note: `executor error: ${err.message}` }; this._pending = false })
         return null
       }
 

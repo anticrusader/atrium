@@ -42,7 +42,7 @@ export async function customStep({ task, chat, limiter }) {
     const head = out.split('\n').map((l) => l.trim()).find(Boolean) || 'produced output'
     return { delta: 1, note: `✨ ${head.replace(/^#+\s*/, '').slice(0, 90)}` }
   } catch (err) {
-    task.phase = 'done'
-    return { delta: 1, note: `custom skill error: ${err.message}` }
+    // Hard failure → the orchestrator retries once, then marks the task FAILED.
+    return { failed: true, note: `custom skill failed: ${err.message}` }
   }
 }

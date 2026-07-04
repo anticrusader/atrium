@@ -97,7 +97,7 @@ export async function rpaDesignStep({ task, chat, limiter }) {
 
     return { delta: 1, note: 'done' }
   } catch (err) {
-    task.phase = 'done'
-    return { delta: 1, note: `rpa-design error: ${err.message}` }
+    // Hard failure → the orchestrator retries once, then marks the task FAILED.
+    return { failed: true, note: `rpa-design failed: ${err.message}` }
   }
 }

@@ -56,6 +56,7 @@ export class Hud {
       ${this._meterHtml('mem', 'MEM', 0)}
       ${this._meterHtml('disk', 'DISK', 0)}
       ${this._meterHtml('net', 'NET', 0)}
+      <div class="host__llm" id="m-llm" style="display:none"></div>
     `
 
     // --- Roster counts + section chips (bottom-left) ---
@@ -74,6 +75,7 @@ export class Hud {
         <div class="board__col"><span id="bd-backlog">0</span><small>backlog</small></div>
         <div class="board__col"><span id="bd-progress" class="board__hot">0</span><small>in progress</small></div>
         <div class="board__col"><span id="bd-done" class="board__ok">0</span><small>done</small></div>
+        <div class="board__col"><span id="bd-failed" class="board__bad">0</span><small>failed</small></div>
       </div>
       <ul class="board__list" id="bd-list"></ul>
     `
@@ -206,6 +208,7 @@ export class Hud {
     this.root.querySelector('#bd-backlog').textContent = by.backlog
     this.root.querySelector('#bd-progress').textContent = by.in_progress + by.assigned
     this.root.querySelector('#bd-done').textContent = completed ?? by.done
+    this.root.querySelector('#bd-failed').textContent = by.failed
 
     // Rows are clickable → task detail. Show the FULL backlog (the list scrolls),
     // then active tasks with bars, then a few recent done.
@@ -216,6 +219,9 @@ export class Hud {
     }
     for (const t of tasks.filter((t) => t.state === 'assigned' || t.state === 'in_progress').slice(0, 5)) {
       rows.push(`<li class="bd-row" data-taskid="${t.id}"><span class="bd-title">${esc(t.title)}</span><span class="bd-track"><span class="bd-fill" style="width:${Math.round((t.progress || 0) * 100)}%"></span></span></li>`)
+    }
+    for (const t of tasks.filter((t) => t.state === 'failed').slice(-2).reverse()) {
+      rows.push(`<li class="bd-row" data-taskid="${t.id}"><span class="bd-title">${esc(t.title)}</span><span class="bd-badge bd-fail">failed</span></li>`)
     }
     for (const t of tasks.filter((t) => t.state === 'done').slice(-3).reverse()) {
       rows.push(`<li class="bd-row" data-taskid="${t.id}"><span class="bd-title">${esc(t.title)}</span><span class="bd-badge bd-done">done</span></li>`)
@@ -235,7 +241,7 @@ export class Hud {
     }
   }
 
-  update({ agents, host, active }) {
+  update({ agents, host, active, llm }) {
     this._agents = agents
     // Counts
     this.root.querySelector('#r-total').textContent = agents.length
@@ -246,6 +252,19 @@ export class Hud {
     this._setMeter('mem', host.mem)
     this._setMeter('disk', host.disk)
     this._setMeter('net', host.net)
+
+    // Live LLM telemetry: the ACTIVE model (post-rotation) + shared-limiter
+    // counters. Only present on a live backend; hidden in the local sim.
+    const llmEl = this.root.querySelector('#m-llm')
+    if (llmEl) {
+      if (llm) {
+        llmEl.style.display = 'block'
+        llmEl.textContent = `⚡ ${llm.model} · ${llm.calls} calls · ${llm.throttled} throttled` +
+          (llm.errors ? ` · ${llm.errors} errors` : '')
+      } else {
+        llmEl.style.display = 'none'
+      }
+    }
 
     // Per-zone occupancy
     const counts = {}

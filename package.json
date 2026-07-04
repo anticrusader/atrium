@@ -11,7 +11,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "email:login": "node server/email-login.js",
-    "diagrams": "node docs/diagrams/export.mjs"
+    "diagrams": "node docs/diagrams/export.mjs",
+    "test": "node --test"
   },
   "dependencies": {
     "three": "^0.169.0",

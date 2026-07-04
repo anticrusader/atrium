@@ -192,7 +192,9 @@ export async function emailStep({ task, chat, limiter }) {
 
     return { delta: 1, note: 'done' }
   } catch (err) {
-    task.phase = 'done'
-    return { delta: 1, note: `email error: ${err.message}` }
+    // Hard failure (Graph error, network) → retry once, then FAILED. The
+    // unconfigured/unauthorized cases above stay graceful completions — they
+    // are expected states, not failures worth retrying.
+    return { failed: true, note: `email failed: ${err.message}` }
   }
 }

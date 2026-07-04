@@ -373,6 +373,13 @@ export class Orchestrator {
     if (!a || !t) return false
     if (a.busy) return false               // don't stomp an in-flight agent
     if (t.state !== TASK_STATE.BACKLOG) return false
+    // Manual assigns honor the same skill gate as the dispatcher — otherwise the
+    // dropdown could quietly hand specialist work to a generalist.
+    const req = requiredSkill(t)
+    if (req && !a.hasSkill(req)) {
+      this._log({ who: 'orchestrator', verb: 'refused', what: `${a.name} lacks skill "${req}" for "${t.title}"` })
+      return false
+    }
     a.assign(t)
     this._log({ who: a.name, verb: 'assigned', what: t.title })
     return true
@@ -476,6 +483,30 @@ export class Orchestrator {
     }
   }
 
+  // ── Fault tolerance ──────────────────────────────────────────────────────
+  // When an agent reports a hard failure (executor threw / watchdog timed out),
+  // the RETRY POLICY lives here, not in the agent: requeue the task once for a
+  // fresh attempt (any agent may pick it up), and if it fails again, dead-letter
+  // it as FAILED so the board shows the truth instead of a fake "done".
+  _handleFailure(taskId, note, events) {
+    const t = this.tasks.get(taskId)
+    if (!t) return
+    t.agentId = null
+    t.attempts = (t.attempts || 0) + 1
+    if (t.attempts < 2) {
+      // Reset transient progress so the retry starts clean.
+      t.state = TASK_STATE.BACKLOG
+      t.progress = 0
+      delete t.phase
+      logTask(t, 'orchestrator', 'requeued for retry —', note)
+      events.push({ who: 'orchestrator', verb: 'requeued', what: `${t.title} (attempt ${t.attempts + 1}/2) — ${note}` })
+    } else {
+      t.state = TASK_STATE.FAILED
+      logTask(t, 'orchestrator', 'gave up —', note)
+      events.push({ who: 'orchestrator', verb: 'marked FAILED', what: `${t.title} — ${note}` })
+    }
+  }
+
   // Log a "no agent has skill X" warning at most once per ~30 ticks per skill,
   // so a backlog of specialist work with no specialist is visible but not spammy.
   _warnMissingSkill(skill, events) {
@@ -500,6 +531,8 @@ export class Orchestrator {
       const line = a.tick(this.tasks)
       if (line) {
         events.push(line)
+        // A hard step failure: the agent freed itself; apply the retry policy.
+        if (line.failed && line.taskId) this._handleFailure(line.taskId, line.what, events)
         if (line.verb === 'completed') this._completed += 1
         if (line.verb === 'completed' && line.taskId) {
           // Deliberate SPECIALIST work (RPA designs, email drafts) leaves a real
@@ -523,9 +556,11 @@ export class Orchestrator {
     events.forEach((e) => this._log(e))
 
     // Keep the wire bounded: retain only the most recent done tasks (the true
-    // cumulative count lives in this._completed).
+    // cumulative count lives in this._completed), and the most recent failures.
     const doneTasks = [...this.tasks.values()].filter((t) => t.state === TASK_STATE.DONE)
     if (doneTasks.length > 40) for (const t of doneTasks.slice(0, doneTasks.length - 40)) this.tasks.delete(t.id)
+    const failedTasks = [...this.tasks.values()].filter((t) => t.state === TASK_STATE.FAILED)
+    if (failedTasks.length > 10) for (const t of failedTasks.slice(0, failedTasks.length - 10)) this.tasks.delete(t.id)
 
     // keep a steady trickle of new work so the demo never stalls
     const backlogCount = [...this.tasks.values()].filter((t) => t.state === TASK_STATE.BACKLOG).length
@@ -547,10 +582,25 @@ export class Orchestrator {
       active,
       completed: this._completed,
       skills: this._skillCatalog(), // custom prompt-skills, so the UI can list them
+      llm: this._llmInfo(),         // live model + shared-limiter counters for the HUD
       // Keep a generous window: with up to maxConcurrent agents emitting a line
       // per tick (plus board/handoff lines), a small slice would silently drop
       // the earliest agents' events (e.g. a fact-check verdict).
       events: events.slice(-16),
+    }
+  }
+
+  // Live LLM telemetry for the HUD: the ACTIVE model (post-rotation) and the
+  // shared executor's counters — so you can literally watch the whole fleet
+  // bottleneck on the rate limit. null when running the simulated executor.
+  _llmInfo() {
+    const ex = this.executor
+    if (!ex || typeof ex.current !== 'function' || !ex.stats) return null
+    return {
+      model: ex.current().split('/').pop(),
+      calls: ex.stats.calls,
+      errors: ex.stats.errors,
+      throttled: ex.stats.rateLimited,
     }
   }
 
@@ -588,6 +638,7 @@ export class Orchestrator {
       host: this._host(metricsSample, active),
       completed: this._completed,
       skills: this._skillCatalog(),
+      llm: this._llmInfo(),
       version: this.version,
     }
   }
