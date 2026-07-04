@@ -36,10 +36,15 @@ export class AgentAvatar {
 
     const tint = tintFor(record.id)
 
-    // Body (rounded capsule)
+    // Body (rounded capsule). Carries an emissive channel that update() pulses
+    // while the agent is WORKING — the whole avatar glows with its status color,
+    // so live activity reads from any zoom level, not just the HUD.
     const body = new THREE.Mesh(
       new THREE.CapsuleGeometry(0.28, 0.5, 4, 12),
-      new THREE.MeshStandardMaterial({ color: tint, roughness: 0.6, metalness: 0.1 })
+      new THREE.MeshStandardMaterial({
+        color: tint, roughness: 0.6, metalness: 0.1,
+        emissive: STATUS_COLOR.working, emissiveIntensity: 0,
+      })
     )
     body.position.y = 0.7
     body.castShadow = true
@@ -76,6 +81,19 @@ export class AgentAvatar {
     this.glow.rotation.x = -Math.PI / 2
     this.glow.position.y = 0.06
 
+    // Work ping — an expanding, fading ring that radiates from the agent while
+    // it's WORKING (a radar blip). Hidden in every other status.
+    this.ping = new THREE.Mesh(
+      new THREE.RingGeometry(0.5, 0.6, 32),
+      new THREE.MeshBasicMaterial({
+        color: STATUS_COLOR.working, transparent: true, opacity: 0,
+        side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending,
+      })
+    )
+    this.ping.rotation.x = -Math.PI / 2
+    this.ping.position.y = 0.07
+    this.ping.visible = false
+
     // Selection ring (hidden until this agent is clicked).
     this.ring = new THREE.Mesh(
       new THREE.RingGeometry(0.6, 0.82, 32),
@@ -97,7 +115,7 @@ export class AgentAvatar {
     this.beacon.position.y = 5.4
     this.beacon.visible = false
 
-    this.group.add(this.glow, this.ring, this.beacon, body, head, this.indicator)
+    this.group.add(this.glow, this.ping, this.ring, this.beacon, body, head, this.indicator)
 
     // Movement state
     this.pos = new THREE.Vector3()
@@ -150,6 +168,9 @@ export class AgentAvatar {
     this.indicator.material.color.setHex(col)
     this.indicator.material.emissive.setHex(col)
     this.glow.material.color.setHex(col)
+    // Body glow + ping take the status color too (only shown while working).
+    this.body.material.emissive.setHex(col)
+    this.ping.material.color.setHex(col)
   }
 
   update(dt, time) {
@@ -203,6 +224,22 @@ export class AgentAvatar {
 
     // Glow breathing
     this.glow.material.opacity = 0.16 + Math.abs(Math.sin(t * 1.5)) * 0.14
+
+    // WORKING makes the whole avatar radiate: the body pulses its status color,
+    // the pad glow widens, and a ping ring expands outward like a radar blip.
+    const working = this.status === 'working'
+    const targetEmissive = working ? 0.3 + Math.sin(t * 3) * 0.18 : this.status === 'thinking' ? 0.15 : 0
+    this.body.material.emissiveIntensity += (targetEmissive - this.body.material.emissiveIntensity) * 0.1
+    const targetGlowScale = working ? 1.45 : 1
+    this.glow.scale.setScalar(this.glow.scale.x + (targetGlowScale - this.glow.scale.x) * 0.08)
+    if (working) {
+      const p = (t * 0.7) % 1 // 0→1 loop: expand + fade
+      this.ping.visible = true
+      this.ping.scale.setScalar(1 + p * 2.2)
+      this.ping.material.opacity = 0.4 * (1 - p)
+    } else {
+      this.ping.visible = false
+    }
 
     // Selection ring spin + beacon pulse
     if (this.selected) {
