@@ -91,6 +91,7 @@ const _now = () => Date.now()
 async function graph(path, { method = 'GET', token, body } = {}) {
   const res = await fetch(`${GRAPH}${path}`, {
     method,
+    signal: AbortSignal.timeout(20_000), // stalled Graph call fails fast, not via watchdog
     headers: {
       Authorization: `Bearer ${token}`,
       ...(body ? { 'Content-Type': 'application/json' } : {}),

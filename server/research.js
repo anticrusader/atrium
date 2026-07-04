@@ -12,6 +12,11 @@
 
 const UA = { 'User-Agent': 'Atrium/0.1 (educational orchestration demo)' }
 
+// All research fetches carry a 10s timeout: a stalled Wikipedia/DDG connection
+// should fail fast (→ the step's failure/retry path) rather than hang the call
+// until the agent watchdog fires ~50s later.
+const get = (url) => fetch(url, { headers: UA, signal: AbortSignal.timeout(10_000) })
+
 // Turn a natural-language question into a good search term, so a typed topic
 // like "what is loop engineering?" searches "loop engineering" (and lands on
 // the right article) instead of matching something unrelated.
@@ -27,7 +32,7 @@ export function cleanQuery(s) {
 async function wikiSearch(topic) {
   const url = `https://en.wikipedia.org/w/api.php?action=query&list=search` +
     `&srsearch=${encodeURIComponent(cleanQuery(topic))}&srlimit=1&format=json`
-  const res = await fetch(url, { headers: UA })
+  const res = await get(url)
   if (!res.ok) return null
   const data = await res.json()
   return data?.query?.search?.[0]?.title ?? null
@@ -35,7 +40,7 @@ async function wikiSearch(topic) {
 
 async function wikiSummary(title) {
   const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`
-  const res = await fetch(url, { headers: UA })
+  const res = await get(url)
   if (!res.ok) return null
   const data = await res.json()
   return data?.extract ?? null
@@ -49,7 +54,7 @@ async function wikiFullText(title, maxChars = 4000) {
   try {
     const url = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1` +
       `&redirects=1&titles=${encodeURIComponent(title)}&format=json`
-    const res = await fetch(url, { headers: UA })
+    const res = await get(url)
     if (res.ok) {
       const data = await res.json()
       const pages = data?.query?.pages || {}
@@ -69,7 +74,7 @@ async function secondSource(claim, topic) {
   const subject = topic || claim
   try {
     const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(subject)}&format=json&no_html=1&skip_disambig=1`
-    const res = await fetch(url, { headers: UA })
+    const res = await get(url)
     if (res.ok) {
       const j = await res.json()
       if (j.AbstractText) return { text: j.AbstractText.slice(0, 1200), src: `DuckDuckGo${j.AbstractSource ? '/' + j.AbstractSource : ''}` }

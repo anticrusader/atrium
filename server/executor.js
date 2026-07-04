@@ -72,11 +72,18 @@ export function makeLLMExecutor(cfg) {
 
   // One raw model call. Shared by the narration step AND the research step.
   // Handles model rotation on 429/5xx. Returns { ok, text, status }.
+  //
+  // The fetch carries a HARD 30s TIMEOUT (AbortSignal). Without it, a stalled
+  // provider connection (e.g. NVIDIA 504-ing under load) hangs the call until
+  // the agent-level watchdog dead-letters the task ~50s later — and the hung
+  // promise never runs `finally`, permanently leaking an inFlight slot. With
+  // it, a stall becomes a fast recoverable "model busy" and we rotate models.
   async function chat(messages, maxTokens = 80) {
     inFlight++
     try {
       const res = await fetch(`${baseURL}/chat/completions`, {
         method: 'POST',
+        signal: AbortSignal.timeout(30_000),
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
@@ -98,6 +105,14 @@ export function makeLLMExecutor(cfg) {
       return { ok: true, text: (data?.choices?.[0]?.message?.content || '').trim() }
     } catch (err) {
       stats.errors++
+      // Timed out / network dropped: treat like a 5xx — this model (or the
+      // provider) is struggling, so rotate to the next and let the caller retry.
+      if (err.name === 'TimeoutError' || err.name === 'AbortError') {
+        console.warn(`[executor] 30s timeout on ${activeModel()} — rotating`)
+        rotate()
+        limiter.backoff(2000)
+        return { ok: false, status: 0, error: 'timed out after 30s' }
+      }
       return { ok: false, status: 0, error: err.message }
     } finally {
       inFlight--
