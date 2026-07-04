@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Atrium — a living 3D office for your agents.
+       The mark: an isometric office floor plate with a column of light rising
+       from it (an atrium is literally a light well), and three status-colored
+       agents standing in the glow. Palette matches the app HUD. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#101a2e"/>
+      <stop offset="1" stop-color="#060a14"/>
+    </linearGradient>
+    <linearGradient id="plate" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1a4a66"/>
+      <stop offset="1" stop-color="#0d2438"/>
+    </linearGradient>
+    <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8cf0ff" stop-opacity="0"/>
+      <stop offset="0.45" stop-color="#2fe6d6" stop-opacity="0.26"/>
+      <stop offset="1" stop-color="#2fe6d6" stop-opacity="0.55"/>
+    </linearGradient>
+    <linearGradient id="core" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c8fffa" stop-opacity="0"/>
+      <stop offset="1" stop-color="#c8fffa" stop-opacity="0.7"/>
+    </linearGradient>
+    <radialGradient id="pool" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#2fe6d6" stop-opacity="0.7"/>
+      <stop offset="1" stop-color="#2fe6d6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="dotGlowT" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#2fe6d6" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#2fe6d6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="dotGlowG" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#57e08a" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#57e08a" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="dotGlowB" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#5ab8ff" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#5ab8ff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Dark rounded tile -->
+  <rect x="8" y="8" width="496" height="496" rx="104" fill="url(#bg)"/>
+  <rect x="8" y="8" width="496" height="496" rx="104" fill="none"
+        stroke="#2fe6d6" stroke-opacity="0.22" stroke-width="4"/>
+
+  <!-- HUD corner brackets (top-left / bottom-right), like the dashboard panels -->
+  <path d="M 70 148 L 70 100 Q 70 70 100 70 L 148 70" fill="none"
+        stroke="#2fe6d6" stroke-opacity="0.6" stroke-width="16" stroke-linecap="round"/>
+  <path d="M 442 364 L 442 412 Q 442 442 412 442 L 364 442" fill="none"
+        stroke="#2fe6d6" stroke-opacity="0.6" stroke-width="16" stroke-linecap="round"/>
+
+  <!-- Isometric floor plate with a slight extrusion -->
+  <polygon points="96,352 256,436 256,458 96,374" fill="#081522"/>
+  <polygon points="416,352 256,436 256,458 416,374" fill="#0a1a2a"/>
+  <polygon points="96,352 256,268 416,352 256,436" fill="url(#plate)"
+           stroke="#2fe6d6" stroke-opacity="0.5" stroke-width="3"/>
+  <polygon points="152,352 256,297 360,352 256,407" fill="none"
+           stroke="#8cd8ff" stroke-opacity="0.16" stroke-width="2"/>
+
+  <!-- The light well: a beam falling onto the plate -->
+  <polygon points="206,58 306,58 290,352 222,352" fill="url(#beam)"/>
+  <polygon points="238,58 274,58 268,352 244,352" fill="url(#core)"/>
+  <ellipse cx="256" cy="352" rx="86" ry="38" fill="url(#pool)"/>
+
+  <!-- Three agents in the light (status colors: thinking, working, walking) -->
+  <circle cx="256" cy="330" r="26" fill="url(#dotGlowT)"/>
+  <circle cx="256" cy="330" r="13" fill="#2fe6d6"/>
+  <circle cx="196" cy="366" r="22" fill="url(#dotGlowG)"/>
+  <circle cx="196" cy="366" r="11" fill="#57e08a"/>
+  <circle cx="318" cy="368" r="22" fill="url(#dotGlowB)"/>
+  <circle cx="318" cy="368" r="11" fill="#5ab8ff"/>
+</svg>
