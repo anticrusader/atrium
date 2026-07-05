@@ -22,7 +22,7 @@ import { EVENT, event, isCommand } from './protocol.js'
 // Load .env (Node 20.6+: no dependency needed). Safe if the file is absent.
 try { process.loadEnvFile() } catch { /* no .env — that's fine */ }
 
-const PORT = Number(process.env.PORT ?? 8787)
+const PORT = Number(process.env.PORT ?? 4787) // moved off 8787 to avoid collisions (embedded in Memex)
 const HOST = process.env.HOST ?? '127.0.0.1'
 const TICK_MS = Number(process.env.TICK_MS ?? 1100)
 

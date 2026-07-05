@@ -4,8 +4,9 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   server: {
     host: '127.0.0.1',
-    port: 5173,
+    port: 4726, // moved off the common 5173 to avoid dev-server collisions (embedded in Memex)
     open: false,
+    strictPort: false,
   },
   build: {
     target: 'es2020',
