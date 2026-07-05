@@ -264,29 +264,26 @@ html, body {
 /* ---------- Toolbar (top-center) ---------- */
 .toolbar {
   top: 18px;
-  left: 50%;
-  transform: translateX(-50%);
+  /* Bound the bar BETWEEN the side panels (brand ~248px left; board+host ~524px
+     right) using left/right instead of centering — centering can't handle the
+     asymmetric sides and used to slide under the board. Buttons wrap when narrow. */
+  left: 260px;
+  right: 540px;
   padding: 8px 10px;
   display: flex;
   gap: 6px;
-  /* Stay clear of the side panels (brand left, host+board right). The centered
-     bar is bounded by the WIDER side (the board), so it can't slide under it;
-     when the viewport is too narrow to fit one row, the buttons wrap instead. */
   flex-wrap: wrap;
   justify-content: center;
-  max-width: calc(100vw - 1080px);
 }
 
 /* ── Embedded-in-Memex mode ─────────────────────────────────────────────────
    Memex loads the app with ?embed=1, which adds `.embedded` to <body>. The
    standalone app NEVER gets this class, so it is completely unaffected. */
 /* Simulation OFF (default in Memex): hide Atrium's own control surface — you
-   drive tasks from Memex's Conductor, so the toolbar + skills panel are noise. */
-.embedded.sim-off .toolbar,
-.embedded.sim-off #skills-panel { display: none !important; }
-/* Simulation ON: controls return. Keep the toolbar tidy in the narrower embed
-   (its default max-width assumes a full-browser viewport). */
-.embedded .toolbar { max-width: 62%; }
+   drive tasks from Memex's Conductor. `.sim-on` is added only when the sim is
+   on, so :not(.sim-on) = simulation off. */
+.embedded:not(.sim-on) .toolbar,
+.embedded:not(.sim-on) #skills-panel { display: none !important; }
 .toolbar button, .agentctl button {
   font-family: var(--mono);
   font-size: 11px;
