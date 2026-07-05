@@ -73,6 +73,9 @@ export class Orchestrator {
     this.customSkills = new Map()
     this.executor = opts.executor ?? simulatedExecutor
     this.autoAssign = opts.autoAssign ?? true
+    // When false, the orchestrator does NOT generate its own simulated backlog —
+    // only tasks you send (e.g. from Memex's Conductor) appear. Toggle via set_sim.
+    this.simulate = opts.simulate ?? true
     // WIP limit: cap how many tasks run AT ONCE. With a rate-limited model, 18
     // agents all working at once starves everyone and the board looks frozen.
     // Capping concurrency lets a few tasks visibly progress and complete while
@@ -431,6 +434,7 @@ export class Orchestrator {
   }
 
   setAuto(enabled) { this.autoAssign = !!enabled }
+  setSim(enabled) { this.simulate = !!enabled }
 
   reset() {
     this.tasks.clear()
@@ -456,6 +460,7 @@ export class Orchestrator {
       case 'define_skill': return !!this.defineSkill(payload)
       case 'delete_skill': return this.deleteSkill(payload.key)
       case 'set_auto': this.setAuto(payload.enabled); return true
+      case 'set_sim': this.setSim(payload.enabled); return true
       case 'reset': this.reset(); return true
       default: return false
     }
@@ -586,9 +591,9 @@ export class Orchestrator {
     const failedTasks = [...this.tasks.values()].filter((t) => t.state === TASK_STATE.FAILED)
     if (failedTasks.length > 10) for (const t of failedTasks.slice(0, failedTasks.length - 10)) this.tasks.delete(t.id)
 
-    // keep a steady trickle of new work so the demo never stalls
+    // keep a steady trickle of new work so the demo never stalls (simulation only)
     const backlogCount = [...this.tasks.values()].filter((t) => t.state === TASK_STATE.BACKLOG).length
-    if (backlogCount < 3 && Math.random() < 0.5) {
+    if (this.simulate && backlogCount < 3 && Math.random() < 0.5) {
       // Mix in real work: ~25% research, ~15% fact-check, rest simulated.
       const roll = Math.random()
       const kind = roll < 0.25 ? 'research' : roll < 0.4 ? 'factcheck' : undefined
