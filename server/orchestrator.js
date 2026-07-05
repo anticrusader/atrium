@@ -440,6 +440,29 @@ export class Orchestrator {
   setAuto(enabled) { this.autoAssign = !!enabled }
   setSim(enabled) { this.simulate = !!enabled }
 
+  // Externally complete a task with a REAL result (e.g. Claude's Conductor output
+  // from Memex), overwriting any simulated result. Matched by title substring.
+  completeTask(match, result) {
+    const m = String(match || '').toLowerCase()
+    if (!m) return false
+    let target = null
+    for (const t of this.tasks.values()) {
+      if (String(t.title || '').toLowerCase().includes(m)) {
+        // prefer a task still in flight; otherwise the most recent match
+        if (!target || t.state !== TASK_STATE.DONE) target = t
+      }
+    }
+    if (!target) return false
+    target.state = TASK_STATE.DONE
+    target.result = result || target.result
+    target.progress = 1
+    for (const a of this.agents.values()) {
+      if (a.taskId === target.id) { a.taskId = null; a.task = 'idle'; a.status = STATUS.IDLE }
+    }
+    this._log({ who: 'Claude · Memex', verb: 'completed', what: target.title, taskId: target.id })
+    return true
+  }
+
   reset() {
     this.tasks.clear()
     _taskSeq = 0
@@ -465,6 +488,7 @@ export class Orchestrator {
       case 'delete_skill': return this.deleteSkill(payload.key)
       case 'set_auto': this.setAuto(payload.enabled); return true
       case 'set_sim': this.setSim(payload.enabled); return true
+      case 'complete_task': return this.completeTask(payload.match, payload.result)
       case 'reset': this.reset(); return true
       default: return false
     }
