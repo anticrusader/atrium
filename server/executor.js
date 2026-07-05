@@ -154,6 +154,10 @@ export function makeLLMExecutor(cfg) {
   // Dispatch by task kind: research/factcheck/verify do REAL tool work; the
   // rest are narrated by the model (simulated).
   async function step(agent, task) {
+    // 'external' tasks are real work happening OUTSIDE Atrium (e.g. Claude via
+    // Memex's Conductor). The agent visibly holds it (never fabricates a result);
+    // it's completed with the real result via the complete_task command.
+    if (task.kind === 'external') return { delta: 0, note: 'running in Claude…' }
     if (task.kind === 'research') return researchStep({ task, chat, limiter })
     if (task.kind === 'factcheck') return factCheckStep({ task, chat, limiter })
     if (task.kind === 'verify') return verifyStep({ task, chat, limiter })

@@ -343,7 +343,8 @@ export class Orchestrator {
       claim: cl,              // the claim under test (factcheck / verify)
       finding: finding ?? null, // stage-1 verdict carried into a verify task
       brief: br,              // the process to automate (rpa-design / custom)
-      skill: k === 'custom' ? skill : undefined, // required skill for a custom task
+      // required skill routes the task to a matching specialist (custom/external)
+      skill: (k === 'custom' || k === 'external') ? skill : undefined,
     }
     // The custom skill's system prompt rides server-side only (`_` → stripped
     // from the wire by _wireTasks); the executor reads it in customStep.
@@ -456,6 +457,7 @@ export class Orchestrator {
     target.state = TASK_STATE.DONE
     target.result = result || target.result
     target.progress = 1
+    target.doneBy = 'Claude · Memex'
     for (const a of this.agents.values()) {
       if (a.taskId === target.id) { a.taskId = null; a.task = 'idle'; a.status = STATUS.IDLE }
     }
