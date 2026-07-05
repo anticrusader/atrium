@@ -138,6 +138,12 @@ export class Hud {
     const out = []
     out.push(`<div class="tp__meta">state: <b style="color:var(--ink)">${t.state}</b> · ${pct}%</div>`)
     out.push(`<div class="tp__meta">${roleLabel}: <b style="color:var(--ink)">${esc(who)}</b></div>`)
+    // processing time: elapsed for done tasks, live-running for in-flight ones
+    const _fmt = (ms) => ms == null ? '—' : ms < 1000 ? `${ms}ms` : ms < 60000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`
+    let _time = null
+    if (t.state === 'done') _time = `took ${_fmt(t.elapsedMs)}`
+    else if (t.startedAt && (t.state === 'in_progress' || t.state === 'assigned')) _time = `running ${_fmt(Date.now() - t.startedAt)}`
+    if (_time) out.push(`<div class="tp__meta">time: <b style="color:var(--ink)">${_time}</b></div>`)
     if (t.topic) out.push(`<div class="tp__meta">topic: ${esc(t.topic)}</div>`)
     if (t.claim) out.push(`<div class="tp__meta">claim: ${esc(t.claim)}</div>`)
     if (parent) out.push(`<div class="tp__meta">↳ handed off from <span class="tp__link" data-taskid="${parent.id}">${esc(parent.title)}</span></div>`)

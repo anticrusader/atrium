@@ -413,6 +413,7 @@ export class Orchestrator {
       return false
     }
     a.assign(t)
+    if (!t.startedAt) t.startedAt = Date.now()
     this._log({ who: a.name, verb: 'assigned', what: t.title })
     return true
   }
@@ -458,6 +459,8 @@ export class Orchestrator {
     target.result = result || target.result
     target.progress = 1
     target.doneBy = 'Claude · Memex'
+    target.doneAt = Date.now()
+    target.elapsedMs = target.startedAt ? target.doneAt - target.startedAt : null
     for (const a of this.agents.values()) {
       if (a.taskId === target.id) { a.taskId = null; a.task = 'idle'; a.status = STATUS.IDLE }
     }
@@ -537,6 +540,7 @@ export class Orchestrator {
       }
       const a = idlePool.splice(idx, 1)[0]
       a.assign(task)
+      if (!task.startedAt) task.startedAt = Date.now()
       this._log({ who: a.name, verb: 'picked up', what: task.title })
       slots--
     }
@@ -592,7 +596,11 @@ export class Orchestrator {
         events.push(line)
         // A hard step failure: the agent freed itself; apply the retry policy.
         if (line.failed && line.taskId) this._handleFailure(line.taskId, line.what, events)
-        if (line.verb === 'completed') this._completed += 1
+        if (line.verb === 'completed') {
+          this._completed += 1
+          const dt = line.taskId ? this.tasks.get(line.taskId) : null
+          if (dt && !dt.doneAt) { dt.doneAt = Date.now(); dt.elapsedMs = dt.startedAt ? dt.doneAt - dt.startedAt : null }
+        }
         if (line.verb === 'completed' && line.taskId) {
           // Deliberate SPECIALIST work (RPA designs, email drafts) leaves a real
           // file, saved before the task is pruned so the deliverable isn't lost.

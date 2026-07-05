@@ -70,6 +70,8 @@ export const COMMAND = Object.freeze({
   DEFINE_SKILL: 'define_skill', // { key, name, system } author/edit a custom prompt-skill
   DELETE_SKILL: 'delete_skill', // { key }            remove a custom prompt-skill
   SET_AUTO: 'set_auto',     // { enabled }           toggle the auto-dispatcher
+  SET_SIM: 'set_sim',       // { enabled }           toggle the self-generating simulation
+  COMPLETE_TASK: 'complete_task', // { match, result } externally finish a task (real result)
   RESET: 'reset',           // {}                    clear tasks, idle everyone
 })
 
