@@ -58,23 +58,27 @@ function buildExecutor() {
   return { executor: ex, label: ex.info.models[0].split('/').pop() }
 }
 
+// SIMULATE=false (set by Memex) → no self-generated backlog; only real tasks.
+const SIMULATE = process.env.SIMULATE !== 'false'
 const { executor, label } = buildExecutor()
 const orchestrator = new Orchestrator({
   executor: executor ?? undefined,
   maxConcurrent: Number(process.env.MAX_CONCURRENT ?? 6),
+  simulate: SIMULATE,
 })
 if (executor) orchestrator.version = `v0.1.0 · ${label} (live)`
 
 // Persistence: restore the saved world if present, else seed a fresh fleet.
-// The fleet + task board survive restarts (state in server/state.json).
+// In non-simulation mode we do NOT restore the old world (it holds simulated
+// tasks) — start clean with just an idle fleet so only real work appears.
 const STATE_FILE = fileURLToPath(new URL('./state.json', import.meta.url))
-const saved = loadState(STATE_FILE)
+const saved = SIMULATE ? loadState(STATE_FILE) : null
 if (saved && Array.isArray(saved.agents) && saved.agents.length) {
   orchestrator.hydrate(saved)
   console.log(`  [state] restored ${saved.agents.length} agents + ${(saved.tasks || []).length} tasks from state.json`)
 } else {
   orchestrator.seed(Number(process.env.FLEET ?? 5))
-  console.log('  [state] no saved world → seeded a fresh fleet')
+  console.log(`  [state] seeded a fresh fleet (simulate=${SIMULATE})`)
 }
 
 const metrics = new Metrics()

@@ -94,9 +94,13 @@ export class Orchestrator {
     // Two SPECIALISTS so skill-routed work has somewhere to go out of the box.
     this.spawn(1, { silent: true, name: 'Sol · Solution Architect', skills: [SKILLS.RPA_ARCHITECT] })
     this.spawn(1, { silent: true, name: 'Mira · Inbox Assistant', skills: [SKILLS.EMAIL] })
-    for (let i = 0; i < 2; i++) this.createTask({}, { silent: true })
-    this.createTask({ kind: 'research' }, { silent: true })
-    this.createTask({ kind: 'factcheck' }, { silent: true })
+    // Seed backlog only in simulation mode. With simulate off (e.g. launched by
+    // Memex), start with an idle fleet and NO tasks — only real work shows up.
+    if (this.simulate) {
+      for (let i = 0; i < 2; i++) this.createTask({}, { silent: true })
+      this.createTask({ kind: 'research' }, { silent: true })
+      this.createTask({ kind: 'factcheck' }, { silent: true })
+    }
   }
 
   // ── Persistence ──────────────────────────────────────────────────────────
