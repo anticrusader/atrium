@@ -649,6 +649,7 @@ export class Orchestrator {
       host,
       active,
       completed: this._completed,
+      simulate: this.simulate,
       skills: this._skillCatalog(), // custom prompt-skills, so the UI can list them
       llm: this._llmInfo(),         // live model + shared-limiter counters for the HUD
       // Keep a generous window: with up to maxConcurrent agents emitting a line
@@ -705,6 +706,7 @@ export class Orchestrator {
       tasks: this._wireTasks(),
       host: this._host(metricsSample, active),
       completed: this._completed,
+      simulate: this.simulate,
       skills: this._skillCatalog(),
       llm: this._llmInfo(),
       version: this.version,

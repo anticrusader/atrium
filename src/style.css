@@ -276,6 +276,17 @@ html, body {
   justify-content: center;
   max-width: calc(100vw - 1080px);
 }
+
+/* ── Embedded-in-Memex mode ─────────────────────────────────────────────────
+   Memex loads the app with ?embed=1, which adds `.embedded` to <body>. The
+   standalone app NEVER gets this class, so it is completely unaffected. */
+/* Simulation OFF (default in Memex): hide Atrium's own control surface — you
+   drive tasks from Memex's Conductor, so the toolbar + skills panel are noise. */
+.embedded.sim-off .toolbar,
+.embedded.sim-off #skills-panel { display: none !important; }
+/* Simulation ON: controls return. Keep the toolbar tidy in the narrower embed
+   (its default max-width assumes a full-browser viewport). */
+.embedded .toolbar { max-width: 62%; }
 .toolbar button, .agentctl button {
   font-family: var(--mono);
   font-size: 11px;

@@ -33,8 +33,13 @@ function boot() {
   controls.onPick((id) => world.select(id))
 
   // Full snapshot: build avatars + seed HUD.
-  gateway.on('snapshot', ({ agents, tasks, host, version, completed, skills, llm }) => {
+  // Embedded in Memex? Hide Atrium's own controls unless the simulation is on.
+  if (new URLSearchParams(location.search).get('embed') === '1') document.body.classList.add('embedded')
+  const applySim = (simulate) => document.body.classList.toggle('sim-on', !!simulate)
+
+  gateway.on('snapshot', ({ agents, tasks, host, version, completed, skills, llm, simulate }) => {
     if (version) hud.setVersion(version)
+    applySim(simulate)
     hud.setMode(gateway.kind)
     world.spawn(agents)
     lastRecords = agents
@@ -49,9 +54,10 @@ function boot() {
   })
 
   // Per-tick: reconcile avatars + refresh HUD, board, feed, and the open panel.
-  gateway.on('tick', ({ agents, tasks, host, active, events, completed, skills, llm }) => {
+  gateway.on('tick', ({ agents, tasks, host, active, events, completed, skills, llm, simulate }) => {
     world.sync(agents)
     lastRecords = agents
+    applySim(simulate)
     hud.setMode(gateway.kind) // kind can flip if a remote feed falls back to sim
     hud.update({ agents, host, active, llm })
     hud.updateBoard(tasks, completed)
