@@ -461,6 +461,7 @@ export class Orchestrator {
     target.doneBy = 'Claude · Memex'
     target.doneAt = Date.now()
     target.elapsedMs = target.startedAt ? target.doneAt - target.startedAt : null
+    this._completed += 1 // count it on the "done" tally (agent-completed tasks bump this elsewhere)
     for (const a of this.agents.values()) {
       if (a.taskId === target.id) { a.taskId = null; a.task = 'idle'; a.status = STATUS.IDLE }
     }
