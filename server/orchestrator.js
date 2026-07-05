@@ -93,7 +93,7 @@ export class Orchestrator {
     for (let i = 0; i < fleet; i++) this.spawn(1, { silent: true })
     // Two SPECIALISTS so skill-routed work has somewhere to go out of the box.
     this.spawn(1, { silent: true, name: 'Sol · Solution Architect', skills: [SKILLS.RPA_ARCHITECT] })
-    this.spawn(1, { silent: true, name: 'Mira · Inbox Assistant', skills: [SKILLS.EMAIL] })
+    this.spawn(1, { silent: true, name: 'Milo · Inbox Assistant', skills: [SKILLS.EMAIL] })
     // Seed backlog only in simulation mode. With simulate off (e.g. launched by
     // Memex), start with an idle fleet and NO tasks — only real work shows up.
     if (this.simulate) {

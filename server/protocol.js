@@ -98,7 +98,7 @@ export const SKILL_FOR_KIND = Object.freeze({
 
 // The required skill for ANY task: built-in map, or a custom task's own skill.
 export function requiredSkill(task) {
-  return SKILL_FOR_KIND[task.kind] || (task.kind === 'custom' ? task.skill : undefined)
+  return SKILL_FOR_KIND[task.kind] || ((task.kind === 'custom' || task.kind === 'external') ? task.skill : undefined)
 }
 
 // Build a command envelope. `id` lets the UI correlate the ACK.

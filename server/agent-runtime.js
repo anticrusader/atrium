@@ -14,7 +14,7 @@
 
 import { STATUS, TASK_STATE } from './protocol.js'
 
-const FIRST = ['Atlas','Juno','Echo','Nova','Orion','Vega','Iris','Cyra','Kilo','Pax','Lyra','Onyx','Wren','Zephyr','Mira','Cleo','Dax','Fenn','Sol','Tess','Bram','Yuki','Nico','Rho','Sable','Quill','Indra']
+const FIRST = ['Atlas','Orion','Pax','Onyx','Dax','Fenn','Sol','Bram','Nico','Kilo','Rho','Cass','Ronan','Silas','Idris','Ezra','Milo','Cyrus','Dorian','Arlo','Zane','Kai','Jax','Flynn','Rex','Dex','Cole','Reid']
 const LAST = ['Quartz','Vela','Marlow','Crane','Ash','Vance','Lark','Reed','Frost','Hale','Vale','Stone','Wilde','North','Cole','Dune','Holt','Rune']
 const MODELS = ['Hermes-4-405B','Hermes-4-70B','Hermes-3-8B','Hermes-3-70B','Hermes-2-Pro']
 const PLATFORMS = ['discord','api','telegram','cli','web','matrix']
